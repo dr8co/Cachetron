@@ -11,4 +11,6 @@ endif ()
 # Additional checks for the Debug build
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wpedantic")
 
-add_executable(redis main.cpp)
+add_executable(server server.cpp)
+
+add_executable(client client.cpp)
