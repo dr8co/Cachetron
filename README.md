@@ -1,3 +1,5 @@
-# About
+# Cachetron
 
-A redis clone, in C++.
+## About
+
+A redis clone, in C and C++.
