@@ -102,9 +102,7 @@ int main() {
 
     // multiple requests
     if (query(fd, "hello1")) goto L_DONE;
-
     if (query(fd, "hello2")) goto L_DONE;
-
     if (query(fd, "hello3")) goto L_DONE;
 
     L_DONE:
