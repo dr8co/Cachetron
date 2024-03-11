@@ -17,7 +17,7 @@ string string_new() {
 void string_free(string *const restrict s) {
     if (s->data) {
         free(s->data);
-        s->data = NULL;
+        s->data = nullptr;
     }
     s->size = 0;
     s->capacity = 0;
@@ -29,7 +29,7 @@ void string_push_back(string *const restrict s, const char c) {
     if (s->size == s->capacity) {
         s->capacity *= 2;
         char *temp = realloc(s->data, s->capacity * sizeof(char));
-        if (temp == NULL) {
+        if (temp == nullptr) {
             return;
         }
         s->data = temp;
@@ -47,8 +47,8 @@ char string_at(const string *const restrict s, const size_t index) {
 
 // Remove the last character from the string
 void string_pop_back(string *const restrict s) {
-    if (s->size > 0) {
-        s->size--;
+    if (s->size) {
+        --s->size;
     }
 }
 
@@ -60,10 +60,10 @@ inline bool string_empty(const string *const restrict s) {
 // Remove the character at the given index
 void string_erase(string *const restrict s, const size_t index) {
     if (index < s->size) {
-        for (size_t i = index; i < s->size - 1; i++) {
+        for (size_t i = index; i < s->size - 1; ++i) {
             s->data[i] = s->data[i + 1];
         }
-        s->size--;
+        --s->size; // Reduce the size
     }
 }
 
@@ -72,7 +72,7 @@ bool string_compare(const string *const restrict s1, const string *const restric
     if (s1->size != s2->size) {
         return false;
     }
-    for (size_t i = 0; i < s1->size; i++) {
+    for (size_t i = 0; i < s1->size; ++i) {
         if (s1->data[i] != s2->data[i]) {
             return false;
         }
@@ -102,16 +102,16 @@ void string_insert(string *const restrict s, const size_t index, const char c) {
         if (s->size == s->capacity) {
             s->capacity *= 2;
             char *temp = realloc(s->data, s->capacity * sizeof(char));
-            if (temp == NULL) {
+            if (temp == nullptr) {
                 return;
             }
             s->data = temp;
         }
-        for (size_t i = s->size; i > index; i--) {
+        for (size_t i = s->size; i > index; --i) {
             s->data[i] = s->data[i - 1];
         }
         s->data[index] = c;
-        s->size++;
+        ++s->size; // increase the size
     }
 }
 
@@ -125,7 +125,7 @@ void string_set(const string *const restrict s, const size_t index, const char c
 // Get the substring of the string
 string string_substr(const string *const restrict s, const size_t start, const size_t len) {
     string sub = string_new();
-    for (size_t i = start; i < start + len; i++) {
+    for (size_t i = start; i < start + len; ++i) {
         string_push_back(&sub, string_at(s, i));
     }
     return sub;
@@ -134,10 +134,10 @@ string string_substr(const string *const restrict s, const size_t start, const s
 // Concatenate two strings
 string string_concat(const string *const restrict s1, const string *const restrict s2) {
     string s = string_new();
-    for (size_t i = 0; i < s1->size; i++) {
+    for (size_t i = 0; i < s1->size; ++i) {
         string_push_back(&s, string_at(s1, i));
     }
-    for (size_t i = 0; i < s2->size; i++) {
+    for (size_t i = 0; i < s2->size; ++i) {
         string_push_back(&s, string_at(s2, i));
     }
     return s;
@@ -145,14 +145,14 @@ string string_concat(const string *const restrict s1, const string *const restri
 
 // Append a string to the end of another string
 void string_append(string *const restrict s1, const string *const restrict s2) {
-    for (size_t i = 0; i < s2->size; i++) {
+    for (size_t i = 0; i < s2->size; ++i) {
         string_push_back(s1, string_at(s2, i));
     }
 }
 
 // Append a char array to the end of the string
 void string_append_cstr(string *const restrict s, const char *const restrict cstr) {
-    for (size_t i = 0; cstr[i] != '\0'; i++) {
+    for (size_t i = 0; cstr[i] != '\0'; ++i) {
         string_push_back(s, cstr[i]);
     }
 }
@@ -160,7 +160,7 @@ void string_append_cstr(string *const restrict s, const char *const restrict cst
 // Convert the string to a char array
 char *string_cstr(const string *const restrict s) {
     char *cstr = malloc((s->size + 1) * sizeof(char));
-    for (size_t i = 0; i < s->size; i++) {
+    for (size_t i = 0; i < s->size; ++i) {
         cstr[i] = s->data[i];
     }
     cstr[s->size] = '\0';
@@ -177,7 +177,7 @@ bool string_compare_cstr(const string *const restrict s, const char *const restr
     if (s->size != len) {
         return false;
     }
-    for (size_t i = 0; i < s->size; i++) {
+    for (size_t i = 0; i < s->size; ++i) {
         if (s->data[i] != cstr[i]) {
             return false;
         }
