@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdio.h>
 #include <errno.h>
 #include "vector.h"
 
@@ -23,18 +22,44 @@ void vector_free(vector *const restrict v) {
     v->capacity = 0;
 }
 
-// Add a new element to the end of the vector
-void vector_push_back(vector *const restrict v, void *const restrict elem) {
+// Round up x to the next power of 2
+static size_t clp2(size_t x) {
+    x -= 1;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+
+    return x + 1;
+}
+
+// Resize a vector
+bool vector_resize(vector *const restrict v, size_t size) {
     errno = 0;
-    if (v->size == v->capacity) {
-        v->capacity *= 2;
-        void *temp = realloc(v->data, v->capacity * sizeof(void *));
-        if (temp == nullptr) {
-            return;
+    size = clp2(size);
+
+    if (size >= v->size) {
+        void *temp = realloc(v->data, size * sizeof(void *));
+        if (temp == nullptr || errno) {
+            return false;
         }
         v->data = temp;
+        v->capacity = size;
+    }
+
+    return true;
+}
+
+// Add a new element to the end of the vector
+bool vector_push_back(vector *const restrict v, void *const restrict elem) {
+    if (v->size == v->capacity) {
+        v->capacity *= 2;
+
+        if (!vector_resize(v, v->capacity)) return false;
     }
     v->data[v->size++] = elem;
+    return true;
 }
 
 // Get the element at the given index
@@ -68,16 +93,12 @@ void vector_erase(vector *const restrict v, const size_t index) {
 }
 
 // Insert a new element at the given index
-void vector_insert(vector *const restrict v, const size_t index, void *const restrict elem) {
-    errno = 0;
+bool vector_insert(vector *const restrict v, const size_t index, void *const restrict elem) {
     if (index < v->size) {
         if (v->size == v->capacity) {
             v->capacity *= 2;
-            void *temp = realloc(v->data, v->capacity * sizeof(void *));
-            if (temp == nullptr) {
-                return;
-            }
-            v->data = temp;
+
+            if (!vector_resize(v, v->capacity)) return false;
         }
         for (size_t i = v->size; i > index; --i) {
             v->data[i] = v->data[i - 1];
@@ -85,6 +106,7 @@ void vector_insert(vector *const restrict v, const size_t index, void *const res
         v->data[index] = elem;
         ++v->size;
     }
+    return true;
 }
 
 // Modify the element at the given index
