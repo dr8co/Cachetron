@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <errno.h>
-#include <stdio.h>
 #include "string.h"
 
 // Create a new string, with initial capacity of 16
@@ -24,17 +23,18 @@ void string_free(string *const restrict s) {
 }
 
 // Append a character to the end of the string
-void string_push_back(string *const restrict s, const char c) {
+bool string_push_back(string *const restrict s, const char c) {
     errno = 0;
     if (s->size == s->capacity) {
         s->capacity *= 2;
         char *temp = realloc(s->data, s->capacity * sizeof(char));
-        if (temp == nullptr) {
-            return;
+        if (temp == nullptr || errno) {
+            return false;
         }
         s->data = temp;
     }
     s->data[s->size++] = c;
+    return true;
 }
 
 // Get the character at the given index
@@ -96,14 +96,14 @@ inline void string_clear(string *const restrict s) {
 }
 
 // Insert a new character at the given index
-void string_insert(string *const restrict s, const size_t index, const char c) {
+bool string_insert(string *const restrict s, const size_t index, const char c) {
     errno = 0;
     if (index < s->size) {
         if (s->size == s->capacity) {
             s->capacity *= 2;
             char *temp = realloc(s->data, s->capacity * sizeof(char));
-            if (temp == nullptr) {
-                return;
+            if (temp == nullptr || errno) {
+                return false;
             }
             s->data = temp;
         }
@@ -113,6 +113,7 @@ void string_insert(string *const restrict s, const size_t index, const char c) {
         s->data[index] = c;
         ++s->size; // increase the size
     }
+    return true;
 }
 
 // Modify the character at the given index

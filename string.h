@@ -11,25 +11,25 @@ string string_new();
 
 void string_free(string *restrict s);
 
-void string_push_back(string *restrict s, char c);
+bool string_push_back(string *restrict s, char c);
 
 char string_at(const string *restrict s, size_t index);
 
 void string_pop_back(string *restrict s);
 
-inline bool string_empty(const string *restrict s);
+bool string_empty(const string *restrict s);
 
 void string_erase(string *restrict s, size_t index);
 
 bool string_compare(const string *restrict s1, const string *restrict s2);
 
-inline size_t string_length(const string *restrict s);
+size_t string_length(const string *restrict s);
 
-inline size_t string_capacity(const string *restrict s);
+size_t string_capacity(const string *restrict s);
 
-inline void string_clear(string *restrict s);
+void string_clear(string *restrict s);
 
-void string_insert(string *restrict s, size_t index, char c);
+bool string_insert(string *restrict s, size_t index, char c);
 
 void string_set(const string *restrict s, size_t index, char c);
 
