@@ -1,6 +1,10 @@
 #include <assert.h>
 #include "../vector.h"
 
+#if !(__GNUC__ >= 13 || __clang_major__ >= 19)
+#define constexpr const
+#endif
+
 void vector_new_creates_empty_vector() {
     vector *v = vector_new(sizeof(int));
     assert(v != nullptr);
