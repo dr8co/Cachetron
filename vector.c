@@ -81,7 +81,7 @@ bool vector_append(vector *const restrict v, const void *const restrict elems, c
             if (!vector_resize(v, new_size)) return false;
         }
 
-        memcpy(v->data + v->size * v->element_size, elems, v->element_size * count);
+        memcpy((char *) v->data + v->size * v->element_size, elems, v->element_size * count);
         v->size = new_size;
         return true;
     }
@@ -96,7 +96,7 @@ bool vector_push_back(vector *const restrict v, const void *const restrict elem)
 // Get the element at the given index
 void *vector_at(const vector *const restrict v, const size_t index) {
     if (v)
-        if (index < v->size) return v->data + index * v->element_size;
+        if (index < v->size) return (char *) v->data + index * v->element_size;
     return nullptr;
 }
 
@@ -115,7 +115,7 @@ bool vector_empty(const vector *const restrict v) {
 bool vector_erase(vector *const restrict v, const size_t index) {
     if (v) {
         if (index < v->size) {
-            memmove(v->data + index * v->element_size, v->data + (index + 1) * v->element_size,
+            memmove((char *) v->data + index * v->element_size, (char *) v->data + (index + 1) * v->element_size,
                     v->element_size * (v->size - index));
             --v->size;
             return true;
@@ -135,10 +135,10 @@ bool vector_insert(vector *const restrict v, const size_t index, const void *con
 
                 if (!vector_resize(v, v->capacity)) return false;
             }
-            memmove(v->data + (index + 1) * v->element_size, v->data + index * v->element_size,
+            memmove((char *) v->data + (index + 1) * v->element_size, (char *) v->data + index * v->element_size,
                     v->element_size * (v->size - index));
 
-            memcpy(v->data + index * v->element_size, elem, v->element_size);
+            memcpy((char *) v->data + index * v->element_size, elem, v->element_size);
             ++v->size;
 
             return true;
@@ -167,7 +167,7 @@ bool vector_set_range(vector *const restrict v, const void *const restrict elem,
                 if (!vector_resize(v, v->capacity)) return false;
             }
 
-            memcpy(v->data + index * v->element_size, elem, v->element_size * count);
+            memcpy((char *) v->data + index * v->element_size, elem, v->element_size * count);
             return true;
         }
     }
