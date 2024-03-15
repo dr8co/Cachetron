@@ -6,17 +6,15 @@
 // Create a new string, with initial capacity of 16
 string *string_new() {
     string *s = malloc(sizeof(string));
-    if (s == nullptr) return nullptr;
-
-    s->data = malloc(16 * sizeof(char));
-    if (s->data == nullptr) {
+    if (s) {
+        if ((s->data = malloc(16 * sizeof(char)))) {
+            s->size = 0;
+            s->capacity = 16;
+            return s;
+        }
         free(s);
-        return nullptr;
     }
-    s->size = 0;
-    s->capacity = 16;
-
-    return s;
+    return nullptr;
 }
 
 // Free the memory used by the string
@@ -34,7 +32,7 @@ void string_free(string *const restrict s) {
 }
 
 // Round up x to the next power of 2
-static unsigned clp2(unsigned x) {
+static size_t clp2(unsigned x) {
     --x;
     x |= x >> 1;
     x |= x >> 2;
@@ -115,9 +113,8 @@ char string_at(const string *const restrict s, const size_t index) {
 
 // Remove the last character from the string
 void string_pop_back(string *const restrict s) {
-    if (s && s->size) {
+    if (s && s->size)
         --s->size;
-    }
 }
 
 // Check if the string is empty
@@ -181,9 +178,8 @@ bool string_insert(string *const restrict s, const size_t index, const char c) {
 
 // Modify the character at the given index
 void string_set(const string *const restrict s, const size_t index, const char c) {
-    if (s && index < s->size) {
+    if (s && index < s->size)
         s->data[index] = c;
-    }
 }
 
 // Get the substring of the string

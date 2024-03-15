@@ -6,18 +6,17 @@
 // Create a new vector, with initial capacity of 16
 vector *vector_new(const size_t elem_size) {
     vector *v = malloc(sizeof(vector));
-    if (v == nullptr) return nullptr;
-
-    v->data = malloc(16 * elem_size);
-    if (v->data == nullptr) {
+    if (v) {
+        v->data = malloc(16 * elem_size);
+        if (v->data) {
+            v->size = 0;
+            v->capacity = 16;
+            v->element_size = elem_size;
+            return v;
+        }
         free(v);
-        return nullptr;
     }
-    v->size = 0;
-    v->capacity = 16;
-    v->element_size = elem_size;
-
-    return v;
+    return nullptr;
 }
 
 // Free the memory used by the vector
@@ -36,7 +35,7 @@ void vector_free(vector *const restrict v) {
 }
 
 // Round up x to the next power of 2
-static unsigned clp2(unsigned x) {
+static size_t clp2(unsigned x) {
     --x;
     x |= x >> 1;
     x |= x >> 2;
@@ -95,15 +94,13 @@ bool vector_push_back(vector *const restrict v, const void *const restrict elem)
 
 // Get the element at the given index
 void *vector_at(const vector *const restrict v, const size_t index) {
-    if (v)
-        if (index < v->size) return (char *) v->data + index * v->element_size;
+    if (v && index < v->size) return (char *) v->data + index * v->element_size;
     return nullptr;
 }
 
 // Remove the last element from the vector
 void vector_pop_back(vector *const restrict v) {
-    if (v)
-        if (v->size > 0) --v->size;
+    if (v && v->size > 0) --v->size;
 }
 
 // Check if the vector is empty
@@ -113,13 +110,11 @@ bool vector_empty(const vector *const restrict v) {
 
 // Remove the element at the given index
 bool vector_erase(vector *const restrict v, const size_t index) {
-    if (v) {
-        if (index < v->size) {
-            memmove((char *) v->data + index * v->element_size, (char *) v->data + (index + 1) * v->element_size,
-                    v->element_size * (v->size - index));
-            --v->size;
-            return true;
-        }
+    if (v && index < v->size) {
+        memmove((char *) v->data + index * v->element_size, (char *) v->data + (index + 1) * v->element_size,
+                v->element_size * (v->size - index));
+        --v->size;
+        return true;
     }
     return false;
 }
@@ -127,8 +122,6 @@ bool vector_erase(vector *const restrict v, const size_t index) {
 // Insert a new element at the given index
 bool vector_insert(vector *const restrict v, const size_t index, const void *const restrict elem) {
     if (v && elem) {
-        if (index == 0 && v->size == 0) return vector_push_back(v, elem);
-
         if (index < v->size) {
             if (v->size + 1 >= v->capacity) {
                 v->capacity *= 2;
@@ -143,6 +136,7 @@ bool vector_insert(vector *const restrict v, const size_t index, const void *con
 
             return true;
         }
+        if (index == 0 && v->size == 0) return vector_push_back(v, elem);
     }
     return false;
 }
@@ -154,9 +148,6 @@ __inline static unsigned max(const unsigned x, const unsigned y) {
 bool vector_set_range(vector *const restrict v, const void *const restrict elem, const size_t index,
                       const size_t count) {
     if (v && elem) {
-        if (index == 0 && v->size == 0)
-            return vector_append(v, elem, count);
-
         if (index < v->size) {
             const size_t new_size = max(v->size, count + index);
 
@@ -170,6 +161,8 @@ bool vector_set_range(vector *const restrict v, const void *const restrict elem,
             memcpy((char *) v->data + index * v->element_size, elem, v->element_size * count);
             return true;
         }
+        if (index == 0 && v->size == 0)
+            return vector_append(v, elem, count);
     }
     return false;
 }
@@ -214,17 +207,15 @@ void vector_clear(vector *const restrict v) {
 // Create a new pointer vector, with initial capacity of 16
 ptr_vector *ptr_vector_new() {
     ptr_vector *v = malloc(sizeof(ptr_vector));
-    if (v == nullptr) return nullptr;
-
-    v->data = malloc(16 * sizeof(void *));
-    if (v->data == nullptr) {
+    if (v) {
+        if ((v->data = malloc(16 * sizeof(void *)))) {
+            v->size = 0;
+            v->capacity = 16;
+            return v;
+        }
         free(v);
-        return nullptr;
     }
-    v->size = 0;
-    v->capacity = 16;
-
-    return v;
+    return nullptr;
 }
 
 // Free the memory used by the pointer vector
@@ -243,94 +234,90 @@ void ptr_vector_free(ptr_vector *const restrict v) {
 
 // Resize a pointer vector
 bool ptr_vector_resize(ptr_vector *const restrict v, size_t size) {
-    if (v == nullptr) return false;
-    if (size <= 16) return true;
+    if (v) {
+        if (size <= 16) return true;
 
-    errno = 0;
-    size = clp2(size);
+        errno = 0;
+        size = clp2(size);
 
-    if (size >= v->size) {
-        void *temp = realloc(v->data, size * sizeof(void *));
-        if (temp == nullptr || errno) {
-            return false;
+        if (size >= v->size) {
+            void *temp = realloc(v->data, size * sizeof(void *));
+            if (temp == nullptr || errno) {
+                return false;
+            }
+            v->data = temp;
+            v->capacity = size;
+            return true;
         }
-        v->data = temp;
-        v->capacity = size;
     }
 
-    return true;
+    return false;
 }
 
 // Add a new element to the end of the pointer vector
 bool ptr_vector_push_back(ptr_vector *const restrict v, void *const restrict elem) {
-    if (v == nullptr) return false;
-
-    if (v->size >= v->capacity) {
+    if (v && v->size >= v->capacity) {
         v->capacity *= 2;
 
         if (!ptr_vector_resize(v, v->capacity)) return false;
+
+        v->data[v->size++] = elem;
+        return true;
     }
 
-    v->data[v->size++] = elem;
-    return true;
+    return false;
 }
 
 // Get the element at the given index
 void *ptr_vector_at(const ptr_vector *const restrict v, const size_t index) {
-    if (v)
-        if (index < v->size) return v->data[index];
-
+    if (v && index < v->size) return v->data[index];
     return nullptr;
 }
 
 // Remove the last element from the pointer vector
 void ptr_vector_pop_back(ptr_vector *const restrict v) {
-    if (v)
-        if (v->size > 0) --v->size;
+    if (v && v->size > 0) --v->size;
 }
 
 // Check if the pointer vector is empty
 bool ptr_vector_empty(const ptr_vector *const restrict v) {
-    return v ? v->size : false;
+    return v ? v->size == 0 : true;
 }
 
 // Remove the element at the given index
 bool ptr_vector_erase(ptr_vector *const restrict v, const size_t index) {
-    if (v) {
-        if (index < v->size) {
-            memmove(v->data + index, v->data + index + 1, (v->size - index) * sizeof(void *));
-            --v->size;
-            return true;
-        }
+    if (v && index < v->size) {
+        memmove(v->data + index, v->data + index + 1, (v->size - index) * sizeof(void *));
+        --v->size;
+        return true;
     }
     return false;
 }
 
 // Modify the element at the given index
 bool ptr_vector_set(const ptr_vector *const restrict v, const size_t index, void *const restrict elem) {
-    if (v) {
-        if (index < v->size) {
-            v->data[index] = elem;
-            return true;
-        }
+    if (v && index < v->size) {
+        v->data[index] = elem;
+        return true;
     }
     return false;
 }
 
 // Resize the vector to the given size, and default construct the new elements to nullptr
 bool ptr_vector_resize_expand(ptr_vector *const restrict v, const size_t new_size) {
-    if (v == nullptr) return false;
+    if (v) {
+        if (new_size <= v->size) return true;
+        if (!ptr_vector_resize(v, new_size)) return false;
 
-    if (new_size <= v->size) return true;
-    if (!ptr_vector_resize(v, new_size)) return false;
+        // Default construct the new elements to point to nullptr
+        for (size_t i = v->size; i < new_size; ++i) {
+            ptr_vector_push_back(v, nullptr);
+        }
 
-    // Default construct the new elements to point to nullptr
-    for (size_t i = v->size; i < new_size; ++i) {
-        ptr_vector_push_back(v, nullptr);
+        v->size = new_size;
+        return true;
     }
-
-    v->size = new_size;
-    return true;
+    return false;
 }
 
 // Returns the underlying array
