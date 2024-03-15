@@ -2,4 +2,4 @@
 
 ## About
 
-A redis clone, in C and C++.
+A redis clone, in C.
