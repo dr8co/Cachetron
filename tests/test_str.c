@@ -1,4 +1,7 @@
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "../string.h"
 
 void string_new_creates_empty_string() {
@@ -84,6 +87,182 @@ void string_append_stores_correct_values() {
     string_free(s2);
 }
 
+void string_push_back_increases_capacity_when_needed() {
+    string *s = string_new();
+    for (int i = 0; i < 17; ++i) {
+        string_push_back(s, 'a');
+    }
+    assert(string_capacity(s) > 16);
+    string_free(s);
+}
+
+void string_pop_back_does_not_decrease_capacity() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    const int old_capacity = string_capacity(s);
+    string_pop_back(s);
+    assert(string_capacity(s) == old_capacity);
+    string_free(s);
+}
+
+void string_insert_increases_capacity_when_needed() {
+    string *s = string_new();
+    for (int i = 0; i < 17; ++i) {
+        string_insert(s, 0, 'a');
+    }
+    assert(string_capacity(s) > 16);
+    string_free(s);
+}
+
+void string_erase_does_not_decrease_capacity() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    const int old_capacity = string_capacity(s);
+    string_erase(s, 0);
+    assert(string_capacity(s) == old_capacity);
+    string_free(s);
+}
+
+void string_clear_does_not_decrease_capacity() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    const int old_capacity = string_capacity(s);
+    string_clear(s);
+    assert(string_capacity(s) == old_capacity);
+    string_free(s);
+}
+
+void string_append_increases_capacity_when_needed() {
+    string *s1 = string_new();
+    string *s2 = string_new();
+    for (int i = 0; i < 9; ++i) {
+        string_push_back(s1, 'a');
+        string_push_back(s2, 'b');
+    }
+    string_append(s1, s2);
+    assert(string_capacity(s1) > 16);
+    string_free(s1);
+    string_free(s2);
+}
+
+void string_set_stores_correct_value() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    string_set(s, 0, 'b');
+    assert(string_at(s, 0) == 'b');
+    string_free(s);
+}
+
+void string_substr_returns_correct_string() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    string_push_back(s, 'b');
+    string_push_back(s, 'c');
+    string *s2 = string_substr(s, 1, 2);
+    assert(string_length(s2) == 2);
+    assert(string_at(s2, 0) == 'b');
+    assert(string_at(s2, 1) == 'c');
+    string_free(s);
+    string_free(s2);
+}
+
+void string_concat_returns_correct_string() {
+    string *s1 = string_new();
+    string *s2 = string_new();
+    string_push_back(s1, 'a');
+    string_push_back(s2, 'b');
+    string *s3 = string_concat(s1, s2);
+    assert(string_length(s3) == 2);
+    assert(string_at(s3, 0) == 'a');
+    assert(string_at(s3, 1) == 'b');
+    string_free(s1);
+    string_free(s2);
+    string_free(s3);
+}
+
+void string_append_cstr_stores_correct_values() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    string_append_cstr(s, "bc");
+    assert(string_length(s) == 3);
+    assert(string_at(s, 1) == 'b');
+    assert(string_at(s, 2) == 'c');
+    string_free(s);
+}
+
+void string_insert_cstr_stores_correct_values() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    string_push_back(s, 'b');
+
+    string_insert_cstr(s, 1, "cd");
+    assert(string_length(s) == 4);
+    assert(string_at(s, 1) == 'c');
+    assert(string_at(s, 2) == 'd');
+    string_free(s);
+}
+
+void string_cstr_returns_correct_cstr() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    string_push_back(s, 'b');
+    string_push_back(s, 'c');
+
+    char *cstr = string_cstr(s);
+    assert(cstr[3] == '\0');
+
+    assert(strcmp(cstr, "abc") == 0);
+    free(cstr);
+    string_free(s);
+}
+
+void string_compare_cstr_returns_true_for_equal_strings() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    string_push_back(s, 'b');
+    assert(string_compare_cstr(s, "ab"));
+    string_free(s);
+}
+
+void string_empty_returns_false_for_non_empty_string() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    assert(!string_empty(s));
+    string_free(s);
+}
+
+void string_empty_returns_true_for_empty_string() {
+    string *s = string_new();
+    assert(string_empty(s));
+    string_free(s);
+}
+
+void string_at_returns_correct_value() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    assert(string_at(s, 0) == 'a');
+    string_free(s);
+}
+
+void string_erase_removes_correct_value() {
+    string *s = string_new();
+    string_push_back(s, 'a');
+    string_push_back(s, 'b');
+    string_erase(s, 0);
+    assert(string_at(s, 0) == 'b');
+    string_free(s);
+}
+
+void string_compare_works_correctly() {
+    string *s1 = string_new();
+    string *s2 = string_new();
+    string_push_back(s1, 'a');
+    string_push_back(s2, 'a');
+    assert(string_compare(s1, s2));
+    string_free(s1);
+    string_free(s2);
+}
+
 int main() {
     string_new_creates_empty_string();
     string_push_back_increases_size();
@@ -95,5 +274,26 @@ int main() {
     string_clear_resets_size();
     string_append_increases_size();
     string_append_stores_correct_values();
+
+    string_push_back_increases_capacity_when_needed();
+    string_pop_back_does_not_decrease_capacity();
+    string_insert_increases_capacity_when_needed();
+    string_erase_does_not_decrease_capacity();
+    string_clear_does_not_decrease_capacity();
+    string_append_increases_capacity_when_needed();
+
+    string_set_stores_correct_value();
+    string_substr_returns_correct_string();
+    string_concat_returns_correct_string();
+    string_append_cstr_stores_correct_values();
+    string_insert_cstr_stores_correct_values();
+    string_cstr_returns_correct_cstr();
+    string_compare_cstr_returns_true_for_equal_strings();
+    string_empty_returns_false_for_non_empty_string();
+
+    string_empty_returns_true_for_empty_string();
+    string_at_returns_correct_value();
+    string_erase_removes_correct_value();
+    string_compare_works_correctly();
     return 0;
 }
