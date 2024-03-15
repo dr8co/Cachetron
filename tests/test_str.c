@@ -263,6 +263,32 @@ void string_compare_works_correctly() {
     string_free(s2);
 }
 
+void string_functions_do_not_crash_for_nullptr() {
+    string_free(nullptr);
+    assert(!string_push_back(nullptr, 'a'));
+    assert(!string_resize(nullptr, 10));
+    assert(string_at(nullptr, 10) == '\0');
+    string_pop_back(nullptr);
+
+    assert(string_empty(nullptr));
+    assert(!string_erase(nullptr, 17));
+    assert(!string_compare(nullptr, nullptr));
+    assert(!string_length(nullptr));
+    assert(!string_capacity(nullptr));
+    string_clear(nullptr);
+
+    assert(!string_insert(nullptr, 1000, 'm'));
+    string_set(nullptr, 0, 'x');
+    assert(string_substr(nullptr, 12, 30) == nullptr);
+    assert(string_concat(nullptr, nullptr) == nullptr);
+    assert(!string_append(nullptr, nullptr));
+
+    assert(string_cstr(nullptr) == nullptr);
+    assert(!string_compare_cstr(nullptr, nullptr));
+    assert(!string_insert_cstr(nullptr, 5, nullptr));
+
+}
+
 int main() {
     string_new_creates_empty_string();
     string_push_back_increases_size();
@@ -295,5 +321,6 @@ int main() {
     string_at_returns_correct_value();
     string_erase_removes_correct_value();
     string_compare_works_correctly();
+    string_functions_do_not_crash_for_nullptr();
     return 0;
 }
