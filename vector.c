@@ -89,7 +89,7 @@ bool vector_append(vector *const restrict v, const void *const restrict elems, c
 
 // Add a new element to the end of the vector
 bool vector_push_back(vector *const restrict v, const void *const restrict elem) {
-    return v && elem ? vector_append(v, elem, 1) : false;
+    return (v && elem) != 0 && vector_append(v, elem, 1);
 }
 
 // Get the element at the given index
@@ -105,7 +105,7 @@ void vector_pop_back(vector *const restrict v) {
 
 // Check if the vector is empty
 bool vector_empty(const vector *const restrict v) {
-    return v ? v->size == 0 : true;
+    return v == nullptr || v->size == 0;
 }
 
 // Remove the element at the given index
@@ -281,7 +281,7 @@ void ptr_vector_pop_back(ptr_vector *const restrict v) {
 
 // Check if the pointer vector is empty
 bool ptr_vector_empty(const ptr_vector *const restrict v) {
-    return v ? v->size == 0 : true;
+    return v == nullptr || v->size == 0;
 }
 
 // Remove the element at the given index

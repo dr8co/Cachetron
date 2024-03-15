@@ -119,7 +119,7 @@ void string_pop_back(string *const restrict s) {
 
 // Check if the string is empty
 bool string_empty(const string *const restrict s) {
-    return s ? s->size == 0 : true;
+    return s == nullptr || s->size == 0;
 }
 
 // Remove the character at the given index
