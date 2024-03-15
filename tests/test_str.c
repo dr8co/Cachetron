@@ -92,14 +92,14 @@ void string_push_back_increases_capacity_when_needed() {
     for (int i = 0; i < 17; ++i) {
         string_push_back(s, 'a');
     }
-    assert(string_capacity(s) > 16);
+    assert(string_capacity(s) > (size_t) 16);
     string_free(s);
 }
 
 void string_pop_back_does_not_decrease_capacity() {
     string *s = string_new();
     string_push_back(s, 'a');
-    const int old_capacity = string_capacity(s);
+    const size_t old_capacity = string_capacity(s);
     string_pop_back(s);
     assert(string_capacity(s) == old_capacity);
     string_free(s);
@@ -110,14 +110,14 @@ void string_insert_increases_capacity_when_needed() {
     for (int i = 0; i < 17; ++i) {
         string_insert(s, 0, 'a');
     }
-    assert(string_capacity(s) > 16);
+    assert(string_capacity(s) > (size_t) 16);
     string_free(s);
 }
 
 void string_erase_does_not_decrease_capacity() {
     string *s = string_new();
     string_push_back(s, 'a');
-    const int old_capacity = string_capacity(s);
+    const size_t old_capacity = string_capacity(s);
     string_erase(s, 0);
     assert(string_capacity(s) == old_capacity);
     string_free(s);
@@ -126,7 +126,7 @@ void string_erase_does_not_decrease_capacity() {
 void string_clear_does_not_decrease_capacity() {
     string *s = string_new();
     string_push_back(s, 'a');
-    const int old_capacity = string_capacity(s);
+    const size_t old_capacity = string_capacity(s);
     string_clear(s);
     assert(string_capacity(s) == old_capacity);
     string_free(s);
@@ -140,7 +140,7 @@ void string_append_increases_capacity_when_needed() {
         string_push_back(s2, 'b');
     }
     string_append(s1, s2);
-    assert(string_capacity(s1) > 16);
+    assert(string_capacity(s1) > (size_t) 16);
     string_free(s1);
     string_free(s2);
 }
