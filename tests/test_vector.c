@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stddef.h>
 #include "../vector.h"
 
 #if !(__GNUC__ >= 13 || __clang_major__ >= 19)

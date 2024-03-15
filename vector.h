@@ -1,5 +1,4 @@
 #pragma once
-#include <stddef.h>
 
 // A mimic of C++ vector (of pointers) in C
 typedef struct {
