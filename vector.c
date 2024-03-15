@@ -49,21 +49,25 @@ static unsigned clp2(unsigned x) {
 
 // Resize a vector
 bool vector_resize(vector *const restrict v, size_t size) {
-    if (size <= 16) return true;
+    if (v) {
+        if (size <= 16) return true;
 
-    errno = 0;
-    size = clp2(size);
+        errno = 0;
+        size = clp2(size);
 
-    if (size >= v->size) {
-        void *temp = realloc(v->data, size * v->element_size);
-        if (temp == nullptr || errno) {
-            return false;
+        if (size >= v->size) {
+            void *temp = realloc(v->data, size * v->element_size);
+            if (temp == nullptr || errno) {
+                return false;
+            }
+            v->data = temp;
+            v->capacity = size;
+
+            return true;
         }
-        v->data = temp;
-        v->capacity = size;
     }
 
-    return true;
+    return false;
 }
 
 // Add a range of elements to the end of the vector
@@ -104,7 +108,7 @@ void vector_pop_back(vector *const restrict v) {
 
 // Check if the vector is empty
 bool vector_empty(const vector *const restrict v) {
-    return v ? v->size : false;
+    return v ? v->size == 0 : true;
 }
 
 // Remove the element at the given index
