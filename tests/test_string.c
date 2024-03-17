@@ -5,7 +5,7 @@
 #include "../string_c.h"
 
 void string_new_creates_empty_string() {
-    string *s = string_new();
+    string_c *s = string_new();
     assert(s != nullptr);
     assert(string_length(s) == 0);
     assert(string_capacity(s) == 16);
@@ -13,21 +13,21 @@ void string_new_creates_empty_string() {
 }
 
 void string_push_back_increases_size() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     assert(string_length(s) == 1);
     string_free(s);
 }
 
 void string_push_back_stores_correct_value() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     assert(string_at(s, 0) == 'a');
     string_free(s);
 }
 
 void string_pop_back_decreases_size() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_pop_back(s);
     assert(string_length(s) == 0);
@@ -35,21 +35,21 @@ void string_pop_back_decreases_size() {
 }
 
 void string_insert_increases_size() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_insert(s, 0, 'a');
     assert(string_length(s) == 1);
     string_free(s);
 }
 
 void string_insert_stores_correct_value() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_insert(s, 0, 'a');
     assert(string_at(s, 0) == 'a');
     string_free(s);
 }
 
 void string_erase_decreases_size() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_erase(s, 0);
     assert(string_length(s) == 0);
@@ -57,7 +57,7 @@ void string_erase_decreases_size() {
 }
 
 void string_clear_resets_size() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_clear(s);
     assert(string_length(s) == 0);
@@ -65,8 +65,8 @@ void string_clear_resets_size() {
 }
 
 void string_append_increases_size() {
-    string *s1 = string_new();
-    string *s2 = string_new();
+    string_c *s1 = string_new();
+    string_c *s2 = string_new();
     string_push_back(s1, 'a');
     string_push_back(s2, 'b');
     string_append(s1, s2);
@@ -76,8 +76,8 @@ void string_append_increases_size() {
 }
 
 void string_append_stores_correct_values() {
-    string *s1 = string_new();
-    string *s2 = string_new();
+    string_c *s1 = string_new();
+    string_c *s2 = string_new();
     string_push_back(s1, 'a');
     string_push_back(s2, 'b');
     string_append(s1, s2);
@@ -88,7 +88,7 @@ void string_append_stores_correct_values() {
 }
 
 void string_push_back_increases_capacity_when_needed() {
-    string *s = string_new();
+    string_c *s = string_new();
     for (int i = 0; i < 17; ++i) {
         string_push_back(s, 'a');
     }
@@ -97,7 +97,7 @@ void string_push_back_increases_capacity_when_needed() {
 }
 
 void string_pop_back_does_not_decrease_capacity() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     const size_t old_capacity = string_capacity(s);
     string_pop_back(s);
@@ -106,7 +106,7 @@ void string_pop_back_does_not_decrease_capacity() {
 }
 
 void string_insert_increases_capacity_when_needed() {
-    string *s = string_new();
+    string_c *s = string_new();
     for (int i = 0; i < 17; ++i) {
         string_insert(s, 0, 'a');
     }
@@ -115,7 +115,7 @@ void string_insert_increases_capacity_when_needed() {
 }
 
 void string_erase_does_not_decrease_capacity() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     const size_t old_capacity = string_capacity(s);
     string_erase(s, 0);
@@ -124,7 +124,7 @@ void string_erase_does_not_decrease_capacity() {
 }
 
 void string_clear_does_not_decrease_capacity() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     const size_t old_capacity = string_capacity(s);
     string_clear(s);
@@ -133,8 +133,8 @@ void string_clear_does_not_decrease_capacity() {
 }
 
 void string_append_increases_capacity_when_needed() {
-    string *s1 = string_new();
-    string *s2 = string_new();
+    string_c *s1 = string_new();
+    string_c *s2 = string_new();
     for (int i = 0; i < 9; ++i) {
         string_push_back(s1, 'a');
         string_push_back(s2, 'b');
@@ -146,7 +146,7 @@ void string_append_increases_capacity_when_needed() {
 }
 
 void string_set_stores_correct_value() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_set(s, 0, 'b');
     assert(string_at(s, 0) == 'b');
@@ -154,11 +154,11 @@ void string_set_stores_correct_value() {
 }
 
 void string_substr_returns_correct_string() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_push_back(s, 'b');
     string_push_back(s, 'c');
-    string *s2 = string_substr(s, 1, 2);
+    string_c *s2 = string_substr(s, 1, 2);
     assert(string_length(s2) == 2);
     assert(string_at(s2, 0) == 'b');
     assert(string_at(s2, 1) == 'c');
@@ -167,11 +167,11 @@ void string_substr_returns_correct_string() {
 }
 
 void string_concat_returns_correct_string() {
-    string *s1 = string_new();
-    string *s2 = string_new();
+    string_c *s1 = string_new();
+    string_c *s2 = string_new();
     string_push_back(s1, 'a');
     string_push_back(s2, 'b');
-    string *s3 = string_concat(s1, s2);
+    string_c *s3 = string_concat(s1, s2);
     assert(string_length(s3) == 2);
     assert(string_at(s3, 0) == 'a');
     assert(string_at(s3, 1) == 'b');
@@ -181,7 +181,7 @@ void string_concat_returns_correct_string() {
 }
 
 void string_append_cstr_stores_correct_values() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_append_cstr(s, "bc");
     assert(string_length(s) == 3);
@@ -191,7 +191,7 @@ void string_append_cstr_stores_correct_values() {
 }
 
 void string_insert_cstr_stores_correct_values() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_push_back(s, 'b');
 
@@ -203,7 +203,7 @@ void string_insert_cstr_stores_correct_values() {
 }
 
 void string_cstr_returns_correct_cstr() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_push_back(s, 'b');
     string_push_back(s, 'c');
@@ -217,7 +217,7 @@ void string_cstr_returns_correct_cstr() {
 }
 
 void string_compare_cstr_returns_true_for_equal_strings() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_push_back(s, 'b');
     assert(string_compare_cstr(s, "ab"));
@@ -225,27 +225,27 @@ void string_compare_cstr_returns_true_for_equal_strings() {
 }
 
 void string_empty_returns_false_for_non_empty_string() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     assert(!string_empty(s));
     string_free(s);
 }
 
 void string_empty_returns_true_for_empty_string() {
-    string *s = string_new();
+    string_c *s = string_new();
     assert(string_empty(s));
     string_free(s);
 }
 
 void string_at_returns_correct_value() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     assert(string_at(s, 0) == 'a');
     string_free(s);
 }
 
 void string_erase_removes_correct_value() {
-    string *s = string_new();
+    string_c *s = string_new();
     string_push_back(s, 'a');
     string_push_back(s, 'b');
     string_erase(s, 0);
@@ -254,8 +254,8 @@ void string_erase_removes_correct_value() {
 }
 
 void string_compare_works_correctly() {
-    string *s1 = string_new();
-    string *s2 = string_new();
+    string_c *s1 = string_new();
+    string_c *s2 = string_new();
     string_push_back(s1, 'a');
     string_push_back(s2, 'a');
     assert(string_compare(s1, s2));

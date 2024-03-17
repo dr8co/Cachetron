@@ -4,8 +4,8 @@
 #include "vector_c.h"
 
 // Create a new vector, with initial capacity of 16
-vector *vector_new(const size_t elem_size) {
-    vector *v = malloc(sizeof(vector));
+vector_c *vector_new(const size_t elem_size) {
+    vector_c *v = malloc(sizeof(vector_c));
     if (v) {
         v->data = malloc(16 * elem_size);
         if (v->data) {
@@ -20,7 +20,7 @@ vector *vector_new(const size_t elem_size) {
 }
 
 // Free the memory used by the vector
-void vector_free(vector *const restrict v) {
+void vector_free(vector_c *const restrict v) {
     if (v) {
         if (v->data) {
             free(v->data);
@@ -47,7 +47,7 @@ static size_t clp2(unsigned x) {
 }
 
 // Resize a vector
-bool vector_resize(vector *const restrict v, size_t size) {
+bool vector_resize(vector_c *const restrict v, size_t size) {
     if (v) {
         if (size <= 16) return true;
 
@@ -69,7 +69,7 @@ bool vector_resize(vector *const restrict v, size_t size) {
 }
 
 // Add a range of elements to the end of the vector
-bool vector_append(vector *const restrict v, const void *const restrict elems, const size_t count) {
+bool vector_append(vector_c *const restrict v, const void *const restrict elems, const size_t count) {
     if (v && elems) {
         if (count == 0) return true;
 
@@ -87,28 +87,28 @@ bool vector_append(vector *const restrict v, const void *const restrict elems, c
 }
 
 // Add a new element to the end of the vector
-bool vector_push_back(vector *const restrict v, const void *const restrict elem) {
+bool vector_push_back(vector_c *const restrict v, const void *const restrict elem) {
     return v && elem && vector_append(v, elem, 1);
 }
 
 // Get the element at the given index
-void *vector_at(const vector *const restrict v, const size_t index) {
+void *vector_at(const vector_c *const restrict v, const size_t index) {
     if (v && index < v->size) return (char *) v->data + index * v->element_size;
     return nullptr;
 }
 
 // Remove the last element from the vector
-void vector_pop_back(vector *const restrict v) {
+void vector_pop_back(vector_c *const restrict v) {
     if (v && v->size > 0) --v->size;
 }
 
 // Check if the vector is empty
-bool vector_empty(const vector *const restrict v) {
+bool vector_empty(const vector_c *const restrict v) {
     return v == nullptr || v->size == 0;
 }
 
 // Remove the element at the given index
-bool vector_erase(vector *const restrict v, const size_t index) {
+bool vector_erase(vector_c *const restrict v, const size_t index) {
     if (v && index < v->size) {
         memmove((char *) v->data + index * v->element_size, (char *) v->data + (index + 1) * v->element_size,
                 v->element_size * (v->size - index));
@@ -119,7 +119,7 @@ bool vector_erase(vector *const restrict v, const size_t index) {
 }
 
 // Insert a new element at the given index
-bool vector_insert(vector *const restrict v, const size_t index, const void *const restrict elem) {
+bool vector_insert(vector_c *const restrict v, const size_t index, const void *const restrict elem) {
     if (v && elem) {
         if (index < v->size) {
             if (v->size + 1 >= v->capacity) {
@@ -142,7 +142,7 @@ __inline static unsigned max(const unsigned x, const unsigned y) {
     return x ^ ((x ^ y) & -(x < y));
 }
 
-bool vector_set_range(vector *const restrict v, const void *const restrict elem, const size_t index,
+bool vector_set_range(vector_c *const restrict v, const void *const restrict elem, const size_t index,
                       const size_t count) {
     if (v && elem) {
         if (index < v->size) {
@@ -163,12 +163,12 @@ bool vector_set_range(vector *const restrict v, const void *const restrict elem,
 }
 
 // Modify the element at the given index
-bool vector_set(vector *const restrict v, const size_t index, const void *const restrict elem) {
+bool vector_set(vector_c *const restrict v, const size_t index, const void *const restrict elem) {
     if (v == nullptr || elem == nullptr) return false;
     return vector_set_range(v, elem, index, 1);
 }
 
-bool vector_resize_expand(vector *const restrict v, const size_t new_size) {
+bool vector_resize_expand(vector_c *const restrict v, const size_t new_size) {
     if (v == nullptr) return false;
     if (new_size <= v->size) return true;
     if (!vector_resize(v, new_size)) return false;
@@ -178,22 +178,22 @@ bool vector_resize_expand(vector *const restrict v, const size_t new_size) {
 }
 
 // Returns the underlying array
-void *vector_data(const vector *const restrict v) {
+void *vector_data(const vector_c *const restrict v) {
     return v ? v->data : nullptr;
 }
 
 // Get the number of elements in the vector
-size_t vector_size(const vector *const restrict v) {
+size_t vector_size(const vector_c *const restrict v) {
     return v ? v->size : 0;
 }
 
 // Get the capacity of the vector
-size_t vector_capacity(const vector *const restrict v) {
+size_t vector_capacity(const vector_c *const restrict v) {
     return v ? v->capacity : 0;
 }
 
 // Remove all elements from the vector
-void vector_clear(vector *const restrict v) {
+void vector_clear(vector_c *const restrict v) {
     if (v) v->size = 0;
 }
 
@@ -201,7 +201,7 @@ void vector_clear(vector *const restrict v) {
 
 // Create a new pointer vector, with initial capacity of 16
 ptr_vector *ptr_vector_new() {
-    ptr_vector *v = (ptr_vector *) malloc(sizeof(ptr_vector));
+    ptr_vector *v = malloc(sizeof(ptr_vector));
     if (v) {
         if ((v->data = (void **) malloc(16 * sizeof(void *)))) {
             v->size = 0;

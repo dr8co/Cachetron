@@ -59,7 +59,7 @@ static int32_t send_req(const int fd, const ptr_vector *cmd) {
     uint32_t len = 4;
 
     for (size_t i = 0; i < ptr_vector_size(cmd); ++i) {
-        len += 4 + string_length((string *) ptr_vector_at(cmd, i));
+        len += 4 + string_length(ptr_vector_at(cmd, i));
     }
     if (len > k_max_msg) return -1;
 
@@ -70,12 +70,12 @@ static int32_t send_req(const int fd, const ptr_vector *cmd) {
     size_t cur = 8;
 
     for (size_t i = 0; i < ptr_vector_size(cmd); ++i) {
-        char *c_str = string_cstr((string *) ptr_vector_at(cmd, i));
-        uint32_t p = string_length((string *) ptr_vector_at(cmd, i));
+        char *c_str = string_cstr(ptr_vector_at(cmd, i));
+        uint32_t p = string_length(ptr_vector_at(cmd, i));
         memcpy(&wbuf[cur], &p, 4);
 
-        memcpy(&wbuf[cur + 4], c_str, string_length((string *) ptr_vector_at(cmd, i)));
-        cur += 4 + string_length((string *) ptr_vector_at(cmd, i));
+        memcpy(&wbuf[cur + 4], c_str, string_length(ptr_vector_at(cmd, i)));
+        cur += 4 + string_length(ptr_vector_at(cmd, i));
         free(c_str);
     }
 
@@ -117,7 +117,7 @@ static int32_t read_res(const int fd) {
     return 0;
 }
 
-int main(int argc, char **argv) {
+int main(const int argc, char **argv) {
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) die("socket() failure");
 
@@ -131,11 +131,11 @@ int main(int argc, char **argv) {
 
     ptr_vector *cmd = ptr_vector_new();
 
-    for (int i = 1; i < argc && i < ptr_vector_capacity(cmd); ++i) {
+    for (int i = 1; i < argc && (size_t) i < ptr_vector_capacity(cmd); ++i) {
         ptr_vector_push_back(cmd, string_new());
-        string_append_cstr((string *) ptr_vector_at(cmd, i - 1), argv[i]);
+        string_append_cstr(ptr_vector_at(cmd, i - 1), argv[i]);
     }
-    int32_t err = send_req(fd, cmd);
+    const int32_t err = send_req(fd, cmd);
     if (err) {
         goto L_DONE;
     }
@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
 L_DONE:
     close(fd);
     for (size_t i = 0; i < ptr_vector_size(cmd); ++i)
-        string_free((string *) ptr_vector_at(cmd, i));
+        string_free(ptr_vector_at(cmd, i));
 
     ptr_vector_free(cmd);
     return 0;
