@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include "string.h"
+#include "string_c.h"
 
 // Create a new string, with initial capacity of 16
 string *string_new() {

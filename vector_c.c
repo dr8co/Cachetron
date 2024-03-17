@@ -1,11 +1,11 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include "vector.h"
+#include "vector_c.h"
 
 // Create a new vector, with initial capacity of 16
 vector *vector_new(const size_t elem_size) {
-    vector *v = (vector *) malloc(sizeof(vector));
+    vector *v = malloc(sizeof(vector));
     if (v) {
         v->data = malloc(16 * elem_size);
         if (v->data) {
