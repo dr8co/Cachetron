@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(Cachetron C CXX)
+project(Cachetron C)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -14,6 +14,8 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wpedantic")
 
 add_subdirectory(tests)
 
-add_executable(server server.cpp vector.cpp vector.h string.cpp string.h)
+add_executable(server server.c vector_c.c vector_c.h string_c.c string_c.h
+        hashtable.c
+        hashtable.h)
 
-add_executable(client client.cpp vector.cpp vector.h string.cpp string.h)
+add_executable(client client.c vector_c.c vector_c.h string_c.c string_c.h)
