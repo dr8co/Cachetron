@@ -1,5 +1,7 @@
 #pragma once
-
+#if __cplusplus
+#define restrict
+#endif
 #include <stddef.h>
 
 // A simple emulation of a C++ string
@@ -50,3 +52,13 @@ char *string_cstr(const string *restrict s);
 bool string_compare_cstr(const string *restrict s, const char *restrict cstr);
 
 bool string_insert_cstr(string *restrict s, size_t index, const char *restrict cstr);
+
+bool string_append_cstr_range(string * restrict s, const char * restrict cstr, size_t count);
+
+bool string_copy_buffer(const string * restrict s, char *buf);
+
+bool string_copy(const string * restrict src, string * restrict dest);
+
+bool string_case_compare(const string * restrict s1, const string * restrict s2);
+
+bool string_case_compare_cstr(const string * restrict s, const char * restrict cstr);

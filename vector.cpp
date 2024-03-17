@@ -5,7 +5,7 @@
 
 // Create a new vector, with initial capacity of 16
 vector *vector_new(const size_t elem_size) {
-    vector *v = malloc(sizeof(vector));
+    vector *v = (vector *) malloc(sizeof(vector));
     if (v) {
         v->data = malloc(16 * elem_size);
         if (v->data) {
@@ -54,18 +54,17 @@ bool vector_resize(vector *const restrict v, size_t size) {
         errno = 0;
         size = clp2(size);
 
-        if (size >= v->size) {
+        if (size >= v->capacity) {
             void *temp = realloc(v->data, size * v->element_size);
             if (temp == nullptr || errno) {
                 return false;
             }
             v->data = temp;
             v->capacity = size;
-
-            return true;
         }
-    }
+        return true;
 
+    }
     return false;
 }
 
@@ -89,7 +88,7 @@ bool vector_append(vector *const restrict v, const void *const restrict elems, c
 
 // Add a new element to the end of the vector
 bool vector_push_back(vector *const restrict v, const void *const restrict elem) {
-    return (v && elem) != 0 && vector_append(v, elem, 1);
+    return v && elem && vector_append(v, elem, 1);
 }
 
 // Get the element at the given index
@@ -124,9 +123,7 @@ bool vector_insert(vector *const restrict v, const size_t index, const void *con
     if (v && elem) {
         if (index < v->size) {
             if (v->size + 1 >= v->capacity) {
-                v->capacity *= 2;
-
-                if (!vector_resize(v, v->capacity)) return false;
+                if (!vector_resize(v, v->capacity * 2)) return false;
             }
             memmove((char *) v->data + (index + 1) * v->element_size, (char *) v->data + index * v->element_size,
                     v->element_size * (v->size - index));
@@ -152,13 +149,11 @@ bool vector_set_range(vector *const restrict v, const void *const restrict elem,
             const size_t new_size = max(v->size, count + index);
 
             if (new_size > v->size) {
-                v->size = new_size;
-                v->capacity = new_size;
-
-                if (!vector_resize(v, v->capacity)) return false;
+                if (!vector_resize(v, new_size)) return false;
             }
-
             memcpy((char *) v->data + index * v->element_size, elem, v->element_size * count);
+            v->size = new_size;
+
             return true;
         }
         if (index == 0 && v->size == 0)
@@ -206,9 +201,9 @@ void vector_clear(vector *const restrict v) {
 
 // Create a new pointer vector, with initial capacity of 16
 ptr_vector *ptr_vector_new() {
-    ptr_vector *v = malloc(sizeof(ptr_vector));
+    ptr_vector *v = (ptr_vector *) malloc(sizeof(ptr_vector));
     if (v) {
-        if ((v->data = malloc(16 * sizeof(void *)))) {
+        if ((v->data = (void **) malloc(16 * sizeof(void *)))) {
             v->size = 0;
             v->capacity = 16;
             return v;
@@ -240,12 +235,12 @@ bool ptr_vector_resize(ptr_vector *const restrict v, size_t size) {
         errno = 0;
         size = clp2(size);
 
-        if (size >= v->size) {
+        if (size >= v->capacity) {
             void *temp = realloc(v->data, size * sizeof(void *));
             if (temp == nullptr || errno) {
                 return false;
             }
-            v->data = temp;
+            v->data = (void **) temp;
             v->capacity = size;
             return true;
         }
@@ -256,10 +251,9 @@ bool ptr_vector_resize(ptr_vector *const restrict v, size_t size) {
 
 // Add a new element to the end of the pointer vector
 bool ptr_vector_push_back(ptr_vector *const restrict v, void *const restrict elem) {
-    if (v && v->size >= v->capacity) {
-        v->capacity *= 2;
-
-        if (!ptr_vector_resize(v, v->capacity)) return false;
+    if (v) {
+        if (v->size == v->capacity)
+            if (!ptr_vector_resize(v, v->capacity * 2)) return false;
 
         v->data[v->size++] = elem;
         return true;
@@ -307,15 +301,14 @@ bool ptr_vector_set(const ptr_vector *const restrict v, const size_t index, void
 bool ptr_vector_resize_expand(ptr_vector *const restrict v, const size_t new_size) {
     if (v) {
         if (new_size <= v->size) return true;
-        if (!ptr_vector_resize(v, new_size)) return false;
+        if (ptr_vector_resize(v, new_size)) {
+            // Initialize the elements
+            for (size_t i = v->size; i < new_size; ++i)
+                ptr_vector_push_back(v, nullptr);
 
-        // Default construct the new elements to point to nullptr
-        for (size_t i = v->size; i < new_size; ++i) {
-            ptr_vector_push_back(v, nullptr);
+            v->size = new_size;
+            return true;
         }
-
-        v->size = new_size;
-        return true;
     }
     return false;
 }

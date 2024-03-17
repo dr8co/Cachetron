@@ -1,4 +1,8 @@
 #pragma once
+#if __cplusplus
+#define restrict
+#endif
+
 
 // A mimic of C++ vector (of pointers) in C
 typedef struct {

@@ -5,9 +5,9 @@
 
 // Create a new string, with initial capacity of 16
 string *string_new() {
-    string *s = malloc(sizeof(string));
+    string *s = (string *) malloc(sizeof(string));
     if (s) {
-        if ((s->data = malloc(16 * sizeof(char)))) {
+        if ((s->data = (char *) calloc(16, sizeof(char)))) {
             s->size = 0;
             s->capacity = 16;
             return s;
@@ -50,15 +50,16 @@ bool string_resize(string *const restrict s, size_t size) {
         errno = 0;
         size = clp2(size);
 
-        if (size >= s->size) {
+        if (size >= s->capacity) {
             void *temp = realloc(s->data, size * sizeof(char));
             if (temp == nullptr || errno) {
                 return false;
             }
-            s->data = temp;
+            s->data = (char *) temp;
+            memset(s->data + s->size, '\0', s->capacity - s->size);
             s->capacity = size;
-            return true;
         }
+        return true;
     }
 
     return false;
@@ -70,8 +71,7 @@ bool string_insert_cstr(string *const restrict s, const size_t index, const char
             const size_t len = strlen(cstr);
             if (index < s->size) {
                 if (s->size + len > s->capacity) {
-                    s->capacity = clp2(s->size + len);
-                    if (!string_resize(s, s->capacity)) return false;
+                    if (!string_resize(s, s->size + len)) return false;
                 }
                 memmove(s->data + (index + len) * sizeof(char), s->data + index * sizeof(char),
                         (s->size - index) * sizeof(char));
@@ -89,13 +89,9 @@ bool string_insert_cstr(string *const restrict s, const size_t index, const char
 
 // Append a character to the end of the string
 bool string_push_back(string *const restrict s, const char c) {
-    if (s) {
-        errno = 0;
-
+    if (s && c != '\0') {
         if (s->size == s->capacity) {
-            s->capacity *= 2;
-
-            if (!string_resize(s, s->capacity)) return false;
+            if (!string_resize(s, s->capacity * 2)) return false;
         }
         s->data[s->size++] = c;
         return true;
@@ -114,7 +110,7 @@ char string_at(const string *const restrict s, const size_t index) {
 // Remove the last character from the string
 void string_pop_back(string *const restrict s) {
     if (s && s->size)
-        --s->size;
+        s->data[--s->size] = '\0';
 }
 
 // Check if the string is empty
@@ -126,7 +122,7 @@ bool string_empty(const string *const restrict s) {
 bool string_erase(string *const restrict s, const size_t index) {
     if (s && index < s->size) {
         memmove(s->data + index * sizeof(char), s->data + (index + 1) * sizeof(char), (s->size - index) * sizeof(char));
-        --s->size;
+        s->data[--s->size] = '\0';
         return true;
     }
     return false;
@@ -138,6 +134,13 @@ bool string_compare(const string *const restrict s1, const string *const restric
         return false;
 
     return memcmp(s1->data, s2->data, s1->size) == 0;
+}
+
+bool string_case_compare(const string *const restrict s1, const string *const restrict s2) {
+    if (s1 == nullptr || s2 == nullptr || s1->size != s2->size)
+        return false;
+
+    return strncasecmp(s1->data, s2->data, s1->size) == 0;
 }
 
 // Get the length of the string
@@ -152,16 +155,18 @@ size_t string_capacity(const string *const restrict s) {
 
 // Clear the string
 void string_clear(string *const restrict s) {
-    if (s) s->size = 0;
+    if (s) {
+        memset(s->data, '\0', s->size);
+        s->size = 0;
+    }
 }
 
 // Insert a new character at the given index
 bool string_insert(string *const restrict s, const size_t index, const char c) {
-    if (s) {
+    if (s && c != '\0') {
         if (index < s->size) {
             if (s->size == s->capacity) {
-                s->capacity *= 2;
-                if (!string_resize(s, s->capacity)) return false;
+                if (!string_resize(s, s->capacity * 2)) return false;
             }
             memmove(s->data + (index + 1) * sizeof(char), s->data + index * sizeof(char),
                     (s->size - index) * sizeof(char));
@@ -178,22 +183,23 @@ bool string_insert(string *const restrict s, const size_t index, const char c) {
 
 // Modify the character at the given index
 void string_set(const string *const restrict s, const size_t index, const char c) {
-    if (s && index < s->size)
+    if (s && c != '\0' && index < s->size)
         s->data[index] = c;
 }
 
 // Get the substring of the string
 string *string_substr(const string *const restrict s, const size_t start, const size_t len) {
     if (s) {
-        if (start >= s->size || start + len - 1 > s->size) return nullptr;
+        if (len == 0 || start + len - 1 > s->size) return nullptr;
 
         string *sub = string_new();
         if (sub) {
-            sub->size = len;
-            if (!string_resize(sub, clp2(len))) return nullptr;
-
-            memcpy(sub->data, s->data + start, len);
-            return sub;
+            if (string_resize(sub, len)) {
+                memcpy(sub->data, s->data + start, len);
+                sub->size = len;
+                return sub;
+            }
+            string_free(sub);
         }
     }
     return nullptr;
@@ -204,53 +210,68 @@ string *string_concat(const string *const restrict s1, const string *const restr
     if (s1 && s2) {
         string *s = string_new();
         if (s) {
-            if (!string_resize(s, s1->size + s2->size)) return nullptr;
+            if (string_resize(s, s1->size + s2->size)) {
+                memcpy(s->data, s1->data, s1->size * sizeof(char));
+                memcpy(s->data + s1->size * sizeof(char), s2->data, s2->size * sizeof(char));
 
-            memcpy(s->data, s1->data, s1->size);
-            memcpy(s->data + s1->size, s2->data, s2->size);
+                s->size = s1->size + s2->size;
 
-            s->size = s1->size + s2->size;
-
-            return s;
+                return s;
+            }
+            string_free(s);
         }
     }
     return nullptr;
 }
 
+bool string_append_range(string *const restrict s1, const string *const restrict s2, const size_t count) {
+    if (s1) {
+        if (count == 0) return true;
+
+        if (s2) {
+            if (count <= s2->size) {
+                if (string_resize(s1, s1->size + count)) {
+                    memcpy(s1->data + s1->size * sizeof(char), s2->data, count * sizeof(char));
+
+                    s1->size += count;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 // Append a string to the end of another string
 bool string_append(string *const restrict s1, const string *const restrict s2) {
-    if (s1 && s2) {
-        if (s2->size == 0) return true;
+    return s2 != nullptr && string_append_range(s1, s2, s2->size);
+}
 
-        if (!string_resize(s1, s1->size + s2->size)) return false;
-
-        memcpy(s1->data + s1->size, s2->data, s2->size);
-
-        s1->size += s2->size;
-        return true;
+bool string_append_cstr_range(string *const restrict s, const char *const restrict cstr, const size_t count) {
+    if (s) {
+        if (count == 0) return true;
+        if (cstr) {
+            if (count <= strlen(cstr)) {
+                if (string_resize(s, s->size + count)) {
+                    memcpy(s->data + s->size * sizeof(char), cstr, count * sizeof(char));
+                    s->size += count;
+                    return true;
+                }
+            }
+        }
     }
     return false;
 }
 
 // Append a char array to the end of the string
 bool string_append_cstr(string *const restrict s, const char *const restrict cstr) {
-    if (s) {
-        if (cstr) {
-            const size_t len = strlen(cstr);
-            if (!string_resize(s, s->size + len)) return false;
-
-            memcpy(s->data + s->size * sizeof(char), cstr, len * sizeof(char));
-            s->size += len;
-        }
-        return true;
-    }
-    return false;
+    return string_append_cstr_range(s, cstr, strlen(cstr));
 }
 
 // Convert the string to a char array
 char *string_cstr(const string *const restrict s) {
     if (s) {
-        char *cstr = malloc((s->size + 1) * sizeof(char));
+        char *cstr = (char *) malloc((s->size + 1) * sizeof(char));
         if (cstr) {
             memcpy(cstr, s->data, s->size);
 
@@ -266,6 +287,35 @@ bool string_compare_cstr(const string *const restrict s, const char *const restr
     if (s && cstr) {
         if (s->size == strlen(cstr))
             return memcmp(s->data, cstr, s->size) == 0;
+    }
+    return false;
+}
+
+bool string_case_compare_cstr(const string *const restrict s, const char *const restrict cstr) {
+    if (s && cstr) {
+        if (s->size == strlen(cstr))
+            return strncasecmp(s->data, cstr, s->size) == 0;
+    }
+    return false;
+}
+
+bool string_copy_buffer(const string *const restrict s, char *buf) {
+    if (s && !string_empty(s)) {
+        memcpy(buf, s->data, s->size * sizeof(char));
+        buf[s->size] = '\0';
+        return true;
+    }
+    return false;
+}
+
+bool string_copy(const string *const restrict src, string *const restrict dest) {
+    if (src && dest && src->data && dest->data) {
+        if (src->size > dest->size)
+            if (!string_resize(dest, src->size)) return false;
+
+        memcpy(dest->data, src->data, src->size * sizeof(char));
+        dest->size = src->size;
+        return true;
     }
     return false;
 }
