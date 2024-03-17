@@ -8,14 +8,21 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <netinet/ip.h>
+#include <map>
+#include <utility>
+
+#include "string.h"
 #include "vector.h"
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
 #if __GNUC__ >= 13 || __clang_major__ >= 19
 constexpr size_t k_max_msg = 4096;
+constexpr size_t k_max_args = 1024;
 #else
-enum : size_t { k_max_msg = 4096 };
+enum : size_t {
+    k_max_msg = 4096,
+    k_max_args = 1024
+};
 
 #define constexpr const
 #endif
@@ -23,7 +30,13 @@ enum : size_t { k_max_msg = 4096 };
 enum {
     STATE_REQ = 0,
     STATE_RES = 1,
-    STATE_END = 2, // for deletion
+    STATE_END = 2 // for deletion
+};
+
+enum {
+    RES_OK = 0,
+    RES_ERR = 1,
+    RES_NX = 2
 };
 
 typedef struct Conn {
@@ -56,7 +69,6 @@ static void fd_set_nb(const int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (errno) {
         die("fcntl error");
-        return;
     }
 
     flags |= O_NONBLOCK;
@@ -88,7 +100,7 @@ static int32_t accept_new_conn(ptr_vector *fd2conn, const int fd) {
     // set the new connection fd to nonblocking mode
     fd_set_nb(connfd);
     // creating the struct Conn
-    Conn *conn = malloc(sizeof(Conn));
+    Conn *conn = (Conn *) malloc(sizeof(Conn));
     if (conn == nullptr) {
         close(connfd);
         return -1;
@@ -105,6 +117,107 @@ static int32_t accept_new_conn(ptr_vector *fd2conn, const int fd) {
 static void state_req(Conn *conn);
 
 static void state_res(Conn *conn);
+
+static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out) {
+    if (len < 4) {
+        return -1;
+    }
+    uint32_t n = 0;
+    memcpy(&n, &data[0], 4);
+    if (n > k_max_args) {
+        return -1;
+    }
+
+    size_t pos = 4;
+    int j = 0;
+
+    while (n--) {
+        if (pos + 4 > len) {
+            return -1;
+        }
+        uint32_t sz = 0;
+        memcpy(&sz, &data[pos], 4);
+        if (pos + 4 + sz > len) {
+            return -1;
+        }
+        ptr_vector_push_back(out, string_new());
+
+        string_append_cstr_range((string *) ptr_vector_at(out, j++), (char *) &data[pos + 4], sz);
+
+        pos += 4 + sz;
+    }
+
+    if (pos != len) {
+        for (size_t i = 0; i < ptr_vector_size(out); ++i)
+            string_free((string *) ptr_vector_at(out, i));
+        return -1; // trailing garbage
+    }
+    return 0;
+}
+
+static std::map<string *, string *> g_map;
+
+static uint32_t do_get(const ptr_vector *cmd, uint8_t *res, uint32_t *reslen) {
+    if (!g_map.count((string *) ptr_vector_at(cmd, 1))) {
+        return RES_NX;
+    }
+    char val[k_max_msg + 1];
+    string_copy_buffer(g_map[(string *) ptr_vector_at(cmd, 1)], val);
+    const size_t len = strlen(val);
+
+    assert(len <= k_max_msg);
+    memcpy(res, val, len);
+    *reslen = (uint32_t) len;
+    return RES_OK;
+}
+
+static uint32_t do_set(const ptr_vector *cmd, const uint8_t *res, const uint32_t *reslen) {
+    (void) res;
+    (void) reslen;
+    g_map[(string *) ptr_vector_at(cmd, 1)] = (string *) ptr_vector_at(cmd, 2);
+
+    return RES_OK;
+}
+
+static uint32_t do_del(const ptr_vector *cmd, const uint8_t *res, const uint32_t *reslen) {
+    (void) res;
+    (void) reslen;
+    g_map.erase((string *) ptr_vector_at(cmd, 1));
+    return RES_OK;
+}
+
+static bool cmd_is(const string *word, const char *cmd) {
+    return string_case_compare_cstr(word, cmd);
+}
+
+static int32_t do_request(const uint8_t *req, uint32_t reqlen,
+                          uint32_t *rescode, uint8_t *res, uint32_t *reslen) {
+    ptr_vector *cmd = ptr_vector_new();
+
+    if (parse_req(req, reqlen, cmd) != 0) {
+        report_error("bad request");
+        ptr_vector_free(cmd);
+        return -1;
+    }
+    if (ptr_vector_size(cmd) == 2 && cmd_is((string *) ptr_vector_at(cmd, 0), "get")) {
+        *rescode = do_get(cmd, res, reslen);
+    } else if (ptr_vector_size(cmd) == 3 && cmd_is((string *) ptr_vector_at(cmd, 0), "set")) {
+        *rescode = do_set(cmd, res, reslen);
+    } else if (ptr_vector_size(cmd) == 2 && cmd_is((string *) ptr_vector_at(cmd, 0), "del")) {
+        *rescode = do_del(cmd, res, reslen);
+    } else {
+        // cmd is not recognized
+        *rescode = RES_ERR;
+        const char *msg = "Unknown cmd";
+        strcpy((char *) res, msg);
+        *reslen = strlen(msg);
+    }
+    for (size_t i = 0; i < ptr_vector_size(cmd); ++i)
+        string_free((string *) ptr_vector_at(cmd, i));
+
+    ptr_vector_free(cmd);
+    return 0;
+}
 
 static bool try_one_request(Conn *conn) {
     // try to parse a request from the buffer
@@ -124,13 +237,19 @@ static bool try_one_request(Conn *conn) {
         return false;
     }
 
-    // got one request, do something with it
-    printf("client says: %.*s\n", len, (char *) &conn->rbuf[4]);
+    // got one request, generate the response
+    uint32_t rescode = 0;
+    uint32_t wlen = 0;
+    int32_t err = do_request(&conn->rbuf[4], len, &rescode, &conn->wbuf[4 + 4], &wlen);
 
-    // generating echoing response
-    memcpy(&conn->wbuf[0], &len, 4);
-    memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
-    conn->wbuf_size = 4 + len;
+    if (err) {
+        conn->state = STATE_END;
+        return false;
+    }
+    wlen += 4;
+    memcpy(&conn->wbuf[0], &wlen, 4);
+    memcpy(&conn->wbuf[4], &rescode, 4);
+    conn->wbuf_size = 4 + wlen;
 
     // remove the request from the buffer.
     const size_t remain = conn->rbuf_size - 4 - len;
@@ -168,7 +287,7 @@ static bool try_fill_buffer(Conn *conn) {
         if (conn->rbuf_size > 0) {
             report_error("unexpected EOF");
         } else {
-            fprintf(stderr, "EOF\n");
+            fputs("EOF\n", stderr);
         }
         conn->state = STATE_END;
         return false;
@@ -251,11 +370,11 @@ int main() {
     rv = listen(fd, SOMAXCONN);
     if (rv) die("listen() failure");
 
-    // a map of all client connections, keyed by fd
-    ptr_vector *fd2conn = ptr_vector_new();
-
     // set the listen fd to nonblocking mode
     fd_set_nb(fd);
+
+    // a map of all client connections, keyed by fd
+    ptr_vector *fd2conn = ptr_vector_new();
 
     vector *poll_args = vector_new(sizeof(struct pollfd));
 
@@ -270,7 +389,7 @@ int main() {
 
         // connection fds
         for (size_t i = 0; i < ptr_vector_size(fd2conn); ++i) {
-            const Conn *conn = ptr_vector_at(fd2conn, i);
+            const Conn *conn = (Conn *) ptr_vector_at(fd2conn, i);
             if (conn == nullptr) continue;
 
             struct pollfd pfd2 = {.fd = -1};
@@ -281,13 +400,13 @@ int main() {
         }
 
         // poll for active fds
-        rv = poll(vector_data(poll_args), vector_size(poll_args), 1000);
+        rv = poll((pollfd *) vector_data(poll_args), vector_size(poll_args), 1000);
         if (rv < 0) die("poll");
 
         // process active connections
         for (size_t i = 1; i < vector_size(poll_args); ++i) {
             if (((struct pollfd *) vector_at(poll_args, i))->revents) {
-                Conn *conn = ptr_vector_at(fd2conn, ((struct pollfd *) vector_at(poll_args, i))->fd);
+                Conn *conn = (Conn *) ptr_vector_at(fd2conn, ((struct pollfd *) vector_at(poll_args, i))->fd);
                 if (conn == nullptr) continue;
 
                 connection_io(conn);
