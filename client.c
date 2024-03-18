@@ -7,8 +7,8 @@
 #include <assert.h>
 #include <errno.h>
 
-#include "string_c.h"
-#include "vector_c.h"
+#include "data_structures/string_c.h"
+#include "data_structures/vector_c.h"
 
 #if __GNUC__ >= 13 || __clang_major__ >= 19
 constexpr size_t k_max_msg = 4096;

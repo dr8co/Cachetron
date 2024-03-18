@@ -9,9 +9,9 @@
 #include <fcntl.h>
 #include <poll.h>
 
-#include "string_c.h"
-#include "vector_c.h"
-#include "hashtable.h"
+#include "data_structures/string_c.h"
+#include "data_structures/vector_c.h"
+#include "data_structures/hashtable.h"
 
 // Gets the containing structure of a member
 #define container_of(ptr, type, member) ({                  \

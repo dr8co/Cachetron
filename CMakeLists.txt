@@ -28,16 +28,16 @@ add_subdirectory(tests)
 
 add_executable(server
         server.c
-        vector_c.c
-        vector_c.h
-        string_c.c
-        string_c.h
-        hashtable.c
-        hashtable.h)
+        data_structures/vector_c.c
+        data_structures/vector_c.h
+        data_structures/string_c.c
+        data_structures/string_c.h
+        data_structures/hashtable.c
+        data_structures/hashtable.h)
 
 add_executable(client
         client.c
-        vector_c.c
-        vector_c.h
-        string_c.c
-        string_c.h)
+        data_structures/vector_c.c
+        data_structures/vector_c.h
+        data_structures/string_c.c
+        data_structures/string_c.h)

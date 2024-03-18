@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../string_c.h"
+#include "../data_structures/string_c.h"
 
 void string_new_creates_empty_string() {
     string_c *s = string_new();
