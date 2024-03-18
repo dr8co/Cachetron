@@ -8,11 +8,15 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <map>
-#include <utility>
 
-#include "string.h"
-#include "vector.h"
+#include "string_c.h"
+#include "vector_c.h"
+#include "hashtable.h"
+
+// Gets the containing structure of a member
+#define container_of(ptr, type, member) ({                  \
+    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+    (type *)( (char *)__mptr - offsetof(type, member) );})
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
 #if __GNUC__ >= 13 || __clang_major__ >= 19
@@ -54,6 +58,18 @@ typedef struct Conn {
     size_t wbuf_sent;
     uint8_t wbuf[4 + k_max_msg];
 } Conn;
+
+// Initialize a new connection
+static void conn_init(Conn *conn) {
+    conn->fd = -1;
+    conn->state = STATE_END;
+    conn->rbuf_size = 0;
+    conn->wbuf_size = 0;
+    conn->wbuf_sent = 0;
+
+    memset(conn->rbuf, 0, sizeof(conn->rbuf)); // initialize rbuf
+    memset(conn->wbuf, 0, sizeof(conn->wbuf)); // initialize wbuf
+}
 
 static void report_error(const char *msg) {
     perror(msg);
@@ -100,18 +116,17 @@ static int32_t accept_new_conn(ptr_vector *fd2conn, const int fd) {
     // set the new connection fd to nonblocking mode
     fd_set_nb(connfd);
     // creating the struct Conn
-    Conn *conn = (Conn *) malloc(sizeof(Conn));
-    if (conn == nullptr) {
-        close(connfd);
-        return -1;
+    Conn *conn = malloc(sizeof(Conn));
+    if (conn) {
+        conn_init(conn);
+
+        conn->fd = connfd;
+        conn->state = STATE_REQ;
+        conn_put(fd2conn, conn);
+        return 0;
     }
-    conn->fd = connfd;
-    conn->state = STATE_REQ;
-    conn->rbuf_size = 0;
-    conn->wbuf_size = 0;
-    conn->wbuf_sent = 0;
-    conn_put(fd2conn, conn);
-    return 0;
+    close(connfd);
+    return -1;
 }
 
 static void state_req(Conn *conn);
@@ -142,55 +157,147 @@ static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out)
         }
         ptr_vector_push_back(out, string_new());
 
-        string_append_cstr_range((string *) ptr_vector_at(out, j++), (char *) &data[pos + 4], sz);
+        string_append_cstr_range(ptr_vector_at(out, j++), (char *) &data[pos + 4], sz);
 
         pos += 4 + sz;
     }
 
     if (pos != len) {
         for (size_t i = 0; i < ptr_vector_size(out); ++i)
-            string_free((string *) ptr_vector_at(out, i));
+            string_free(ptr_vector_at(out, i));
         return -1; // trailing garbage
     }
     return 0;
 }
 
-static std::map<string *, string *> g_map;
+// The data structure for the key space.
+static struct {
+    HMap db;
+} g_data;
+
+// The structure for the key
+typedef struct Entry {
+    HNode node;
+    string_c *key;
+    string_c *value;
+} Entry;
+
+// initialize an Entry
+static void entry_init(Entry *entry) {
+    entry->node = (HNode){};
+    entry->key = string_new();
+    entry->value = string_new();
+}
+
+// free an Entry
+static void entry_free(const Entry *entry) {
+    string_free(entry->key);
+    string_free(entry->value);
+}
+
+#if __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-statement-expression-from-macro-expansion"
+#elif __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+static bool entry_eq(const HNode *lhs, const HNode *rhs) {
+    return string_compare(container_of(lhs, Entry, node)->key, container_of(rhs, Entry, node)->key);
+}
+
+static uint64_t str_hash(const uint8_t *data, const size_t len) {
+    uint32_t hash = 0x811C9DC5;
+    for (size_t i = 0; i < len; ++i) {
+        hash = (hash + data[i]) * 0x01000193;
+    }
+    return hash;
+}
 
 static uint32_t do_get(const ptr_vector *cmd, uint8_t *res, uint32_t *reslen) {
-    if (!g_map.count((string *) ptr_vector_at(cmd, 1))) {
-        return RES_NX;
-    }
-    char val[k_max_msg + 1];
-    string_copy_buffer(g_map[(string *) ptr_vector_at(cmd, 1)], val);
-    const size_t len = strlen(val);
+    Entry key;
+    entry_init(&key);
 
-    assert(len <= k_max_msg);
-    memcpy(res, val, len);
-    *reslen = (uint32_t) len;
-    return RES_OK;
+    string_swap(key.key, ptr_vector_at(cmd, 1));
+    key.node.hcode = str_hash((uint8_t *) key.key->data, string_length(key.key));
+
+    const HNode *node = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    if (node) {
+        const string_c *val = container_of(node, Entry, node)->value;
+        assert(string_length(val) <= k_max_msg);
+        memcpy(res, val->data, string_length(val));
+        *reslen = (uint32_t) string_length(val);
+
+        entry_free(&key);
+        return RES_OK;
+    }
+    entry_free(&key);
+    return RES_NX;
 }
 
 static uint32_t do_set(const ptr_vector *cmd, const uint8_t *res, const uint32_t *reslen) {
     (void) res;
     (void) reslen;
-    g_map[(string *) ptr_vector_at(cmd, 1)] = (string *) ptr_vector_at(cmd, 2);
 
+    Entry key;
+    entry_init(&key);
+
+    string_swap(key.key, ptr_vector_at(cmd, 1));
+    key.node.hcode = str_hash((uint8_t *) key.key->data, string_length(key.key));
+
+    const HNode *node = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    if (node) {
+        string_swap(container_of(node, Entry, node)->value, ptr_vector_at(cmd, 2));
+    } else {
+        Entry *new_entry = malloc(sizeof(Entry));
+        if (new_entry == nullptr) {
+            entry_free(&key);
+            return RES_ERR;
+        }
+        new_entry->key = string_new();
+        new_entry->value = string_new();
+
+        string_swap(new_entry->key, key.key);
+        new_entry->node.hcode = key.node.hcode;
+        string_swap(new_entry->value, ptr_vector_at(cmd, 2));
+        hm_insert(&g_data.db, &new_entry->node);
+    }
+    entry_free(&key);
     return RES_OK;
 }
 
 static uint32_t do_del(const ptr_vector *cmd, const uint8_t *res, const uint32_t *reslen) {
     (void) res;
     (void) reslen;
-    g_map.erase((string *) ptr_vector_at(cmd, 1));
+
+    Entry key;
+    entry_init(&key);
+
+    string_swap(key.key, ptr_vector_at(cmd, 1));
+    key.node.hcode = str_hash((uint8_t *) key.key->data, string_length(key.key));
+
+    const HNode *node = hm_pop(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    if (node) {
+        Entry *entry = container_of(node, Entry, node);
+        string_free(entry->key);
+        string_free(entry->value);
+        free(entry);
+    }
+    entry_free(&key);
     return RES_OK;
 }
 
-static bool cmd_is(const string *word, const char *cmd) {
+#if __clang__
+#pragma clang diagnostic pop
+#elif __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
+static bool cmd_is(const string_c *word, const char *cmd) {
     return string_case_compare_cstr(word, cmd);
 }
 
-static int32_t do_request(const uint8_t *req, uint32_t reqlen,
+static int32_t do_request(const uint8_t *req, const uint32_t reqlen,
                           uint32_t *rescode, uint8_t *res, uint32_t *reslen) {
     ptr_vector *cmd = ptr_vector_new();
 
@@ -199,11 +306,11 @@ static int32_t do_request(const uint8_t *req, uint32_t reqlen,
         ptr_vector_free(cmd);
         return -1;
     }
-    if (ptr_vector_size(cmd) == 2 && cmd_is((string *) ptr_vector_at(cmd, 0), "get")) {
+    if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "get")) {
         *rescode = do_get(cmd, res, reslen);
-    } else if (ptr_vector_size(cmd) == 3 && cmd_is((string *) ptr_vector_at(cmd, 0), "set")) {
+    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "set")) {
         *rescode = do_set(cmd, res, reslen);
-    } else if (ptr_vector_size(cmd) == 2 && cmd_is((string *) ptr_vector_at(cmd, 0), "del")) {
+    } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "del")) {
         *rescode = do_del(cmd, res, reslen);
     } else {
         // cmd is not recognized
@@ -213,7 +320,7 @@ static int32_t do_request(const uint8_t *req, uint32_t reqlen,
         *reslen = strlen(msg);
     }
     for (size_t i = 0; i < ptr_vector_size(cmd); ++i)
-        string_free((string *) ptr_vector_at(cmd, i));
+        string_free(ptr_vector_at(cmd, i));
 
     ptr_vector_free(cmd);
     return 0;
@@ -240,7 +347,7 @@ static bool try_one_request(Conn *conn) {
     // got one request, generate the response
     uint32_t rescode = 0;
     uint32_t wlen = 0;
-    int32_t err = do_request(&conn->rbuf[4], len, &rescode, &conn->wbuf[4 + 4], &wlen);
+    const int32_t err = do_request(&conn->rbuf[4], len, &rescode, &conn->wbuf[4 + 4], &wlen);
 
     if (err) {
         conn->state = STATE_END;
@@ -376,7 +483,7 @@ int main() {
     // a map of all client connections, keyed by fd
     ptr_vector *fd2conn = ptr_vector_new();
 
-    vector *poll_args = vector_new(sizeof(struct pollfd));
+    vector_c *poll_args = vector_new(sizeof(struct pollfd));
 
     // event loop
     while (true) {
@@ -389,7 +496,7 @@ int main() {
 
         // connection fds
         for (size_t i = 0; i < ptr_vector_size(fd2conn); ++i) {
-            const Conn *conn = (Conn *) ptr_vector_at(fd2conn, i);
+            const Conn *conn = ptr_vector_at(fd2conn, i);
             if (conn == nullptr) continue;
 
             struct pollfd pfd2 = {.fd = -1};
@@ -400,13 +507,13 @@ int main() {
         }
 
         // poll for active fds
-        rv = poll((pollfd *) vector_data(poll_args), vector_size(poll_args), 1000);
+        rv = poll(vector_data(poll_args), vector_size(poll_args), 1000);
         if (rv < 0) die("poll");
 
         // process active connections
         for (size_t i = 1; i < vector_size(poll_args); ++i) {
             if (((struct pollfd *) vector_at(poll_args, i))->revents) {
-                Conn *conn = (Conn *) ptr_vector_at(fd2conn, ((struct pollfd *) vector_at(poll_args, i))->fd);
+                Conn *conn = ptr_vector_at(fd2conn, ((struct pollfd *) vector_at(poll_args, i))->fd);
                 if (conn == nullptr) continue;
 
                 connection_io(conn);
