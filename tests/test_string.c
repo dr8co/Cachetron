@@ -263,6 +263,59 @@ void string_compare_works_correctly() {
     string_free(s2);
 }
 
+void string_swap_swaps_contents_correctly() {
+    string_c *s1 = string_new();
+    string_c *s2 = string_new();
+
+    string_push_back(s1, 'a');
+    string_push_back(s1, 'b');
+    string_push_back(s1, 'c');
+    string_push_back(s1, 'z');
+    const size_t size1 = string_length(s1);
+
+    string_push_back(s2, 'd');
+    string_push_back(s2, 'e');
+    string_push_back(s2, 'f');
+    const size_t size2 = string_length(s2);
+
+    assert(string_swap(s1, s2));
+    assert(string_at(s1, 0) == 'd');
+    assert(string_at(s1, 2) == 'f');
+
+    assert(string_at(s2, 0) == 'a');
+    assert(string_at(s2, 3) == 'z');
+
+    assert(size1 == string_length(s2));
+    assert(size2 == string_length(s1));
+
+    string_free(s1);
+    string_free(s2);
+}
+
+void string_swap_handles_empty_strings() {
+    string_c *s1 = string_new();
+    string_c *s2 = string_new();
+    string_push_back(s1, 'a');
+
+    assert(string_swap(s1, s2));
+    assert(string_empty(s1));
+    assert(string_at(s2, 0) == 'a');
+
+    string_free(s1);
+    string_free(s2);
+}
+
+void string_swap_returns_false_for_nullptr() {
+    string_c *s = string_new();
+    string_push_back(s, 'a');
+
+    assert(!string_swap(s, nullptr));
+    assert(!string_swap(nullptr, s));
+    assert(!string_swap(nullptr, nullptr));
+
+    string_free(s);
+}
+
 void string_functions_do_not_crash_for_nullptr() {
     string_free(nullptr);
     assert(!string_push_back(nullptr, 'a'));
@@ -286,7 +339,6 @@ void string_functions_do_not_crash_for_nullptr() {
     assert(string_cstr(nullptr) == nullptr);
     assert(!string_compare_cstr(nullptr, nullptr));
     assert(!string_insert_cstr(nullptr, 5, nullptr));
-
 }
 
 int main() {
@@ -322,5 +374,9 @@ int main() {
     string_erase_removes_correct_value();
     string_compare_works_correctly();
     string_functions_do_not_crash_for_nullptr();
+
+    string_swap_swaps_contents_correctly();
+    string_swap_handles_empty_strings();
+    string_swap_returns_false_for_nullptr();
     return 0;
 }
