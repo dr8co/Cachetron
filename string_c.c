@@ -319,3 +319,14 @@ bool string_copy(const string_c *const restrict src, string_c *const restrict de
     }
     return false;
 }
+
+// Swap the contents of two strings
+bool string_swap(string_c *const restrict s1, string_c *const restrict s2) {
+    if (s1 && s2) {
+        const string_c temp = *s1;
+        *s1 = *s2;
+        *s2 = temp;
+        return true;
+    }
+    return false;
+}

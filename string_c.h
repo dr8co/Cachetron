@@ -53,12 +53,14 @@ bool string_compare_cstr(const string_c *restrict s, const char *restrict cstr);
 
 bool string_insert_cstr(string_c *restrict s, size_t index, const char *restrict cstr);
 
-bool string_append_cstr_range(string_c * restrict s, const char * restrict cstr, size_t count);
+bool string_append_cstr_range(string_c *restrict s, const char *restrict cstr, size_t count);
 
-bool string_copy_buffer(const string_c * restrict s, char *buf);
+bool string_copy_buffer(const string_c *restrict s, char *buf);
 
-bool string_copy(const string_c * restrict src, string_c * restrict dest);
+bool string_copy(const string_c *restrict src, string_c *restrict dest);
 
-bool string_case_compare(const string_c * restrict s1, const string_c * restrict s2);
+bool string_case_compare(const string_c *restrict s1, const string_c *restrict s2);
 
-bool string_case_compare_cstr(const string_c * restrict s, const char * restrict cstr);
+bool string_case_compare_cstr(const string_c *restrict s, const char *restrict cstr);
+
+bool string_swap(string_c *restrict s1, string_c *restrict s2);
