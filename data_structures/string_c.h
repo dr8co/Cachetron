@@ -2,22 +2,28 @@
 #if __cplusplus
 #define restrict
 #endif
+
 #include <stddef.h>
 
-// A simple emulation of a C++ string
-typedef struct {
-    char *data;
-    size_t size;
-    size_t capacity;
-} string_c;
+/**
+ * @brief A simple emulation of a C++ string in C.
+ *
+ * The data is stored as a pointer to a dynamically allocated array of characters.\n
+ * The capacity represents the total number of characters that the string can hold without needing to be resized.\n
+ * When the size reaches the capacity, the string is resized to a larger capacity to accommodate more characters.
+ */
+struct string_c {
+    char *data;         ///< A pointer to the character data.
+    size_t size;        ///< The number of characters in the string, not including the null character.
+    size_t capacity;    ///< The total number of characters that the string can hold.
+};
+typedef struct string_c string_c;
 
 string_c *string_new();
 
 void string_free(string_c *restrict s);
 
 bool string_push_back(string_c *restrict s, char c);
-
-bool string_resize(string_c *restrict s, size_t size);
 
 char string_at(const string_c *restrict s, size_t index);
 

@@ -82,13 +82,6 @@ void vector_erase_decreases_size() {
     vector_free(v);
 }
 
-void vector_resize_expand_increases_size() {
-    vector_c *v = vector_new(sizeof(int));
-    vector_resize_expand(v, 20);
-    assert(vector_size(v) == 20);
-    vector_free(v);
-}
-
 void vector_clear_resets_size() {
     vector_c *v = vector_new(sizeof(int));
     constexpr int value = 5;
@@ -133,10 +126,6 @@ void vector_erase_does_not_crash_for_nullptr() {
     vector_erase(nullptr, 0);
 }
 
-void vector_resize_expand_does_not_crash_for_nullptr() {
-    vector_resize_expand(nullptr, 20);
-}
-
 void vector_clear_does_not_crash_for_nullptr() {
     vector_clear(nullptr);
 }
@@ -151,7 +140,6 @@ int main() {
     vector_insert_increases_size();
     vector_insert_stores_correct_value();
     vector_erase_decreases_size();
-    vector_resize_expand_increases_size();
     vector_clear_resets_size();
 
     vector_size_returns_zero_for_nullptr();
@@ -162,7 +150,6 @@ int main() {
     vector_append_does_not_crash_for_nullptr();
     vector_insert_does_not_crash_for_nullptr();
     vector_erase_does_not_crash_for_nullptr();
-    vector_resize_expand_does_not_crash_for_nullptr();
     vector_clear_does_not_crash_for_nullptr();
     return 0;
 }

@@ -2,24 +2,39 @@
 
 #include <stdint.h>
 
-// Hash table node
-typedef struct HNode {
-    struct HNode *next;
-    uint64_t hcode; // hash code
-} HNode;
+/**
+ * @brief A structure representing a node in the hash table.
+ *
+ * Each node has a pointer to the next node and a hash code.
+ */
+struct HNode {
+    struct HNode *next; ///< A pointer to the next node in the hash table.
+    uint64_t hcode;     ///< The hash code of the node.
+};
+typedef struct HNode HNode;
 
-// a simple fixed-sized hash table
-typedef struct HTab {
-    HNode **tab; // array of pointers to nodes
-    size_t mask; // mask for fast modulo
-    size_t size; // number of nodes
-} HTab;
+/**
+ * @brief A structure representing a simple fixed-sized hash table.
+ *
+ * It contains an array of pointers to nodes, a mask for fast modulo operations,
+ * and the size of the hash table.
+ */
+struct HTab {
+    HNode **tab;  ///< An array of pointers to nodes in the hash table.
+    size_t mask;  ///< A mask for fast modulo operations.
+    size_t size;  ///< The number of nodes in the hash table.
+};
+typedef struct HTab HTab;
 
-// The real hash table, which uses 2 hash tables for progressive resizing
+/**
+ * @brief A structure representing a real hash table that uses two hash tables for progressive resizing.
+ *
+ * It contains two hash tables (\p ht1 and \p ht2), and a resizing position.
+ */
 typedef struct HMap {
-    HTab ht1;            // newer
-    HTab ht2;            // older
-    size_t resizing_pos; // resizing position
+    HTab ht1;            ///< The newer hash table.
+    HTab ht2;            ///< The older hash table.
+    size_t resizing_pos; ///< The current position in the resizing process.
 } HMap;
 
 HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *));

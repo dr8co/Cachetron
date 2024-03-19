@@ -35,12 +35,12 @@
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
 #if __GNUC__ >= 13 || __clang_major__ >= 19
-constexpr size_t k_max_msg = 4096;  // maximum message size
-constexpr size_t k_max_args = 1024; // maximum number of arguments
+constexpr size_t k_max_msg = 4096;  ///< The maximum message size
+constexpr size_t k_max_args = 1024; ///< The maximum number of arguments
 #else
 enum : size_t {
-    k_max_msg = 4096, // maximum message size
-    k_max_args = 1024 // maximum number of arguments
+    k_max_msg = 4096, ///< The maximum message size
+    k_max_args = 1024 ///< The maximum number of arguments
 };
 
 #define constexpr const
@@ -139,7 +139,7 @@ static void fd_set_nb(const int fd) {
 static void conn_put(ptr_vector *fd2conn, Conn *conn) {
     // resize the vector if necessary
     if (ptr_vector_size(fd2conn) <= (size_t) conn->fd) {
-        ptr_vector_resize_expand(fd2conn, conn->fd + 1);
+        ptr_vector_expand(fd2conn, conn->fd + 1);
     }
     ptr_vector_set(fd2conn, conn->fd, conn);
 }
@@ -243,7 +243,7 @@ static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out)
  * The database is represented as an instance of the HMap data structure.
  */
 static struct {
-    HMap db;
+    HMap db; ///< The hash map used by the server to store key-value pairs.
 } g_data;
 
 /**
@@ -253,11 +253,12 @@ static struct {
  * Each entry consists of a node (used by the hash map), a key, and a value.\n
  * The key and value are represented as instances of the \p string_c data structure.
  */
-typedef struct Entry {
+struct Entry {
     HNode node;        ///< The node used by the hash map.
-    string_c *key;     ///< The key of the entry.
-    string_c *value;   ///< The value of the entry.
-} Entry;
+    string_c *key;     ///< The key of the hash map entry.
+    string_c *value;   ///< The value of the hash map entry.
+};
+typedef struct Entry Entry;
 
 /**
  * @brief Initializes an Entry structure.
@@ -478,13 +479,6 @@ static bool cmd_is(const string_c *word, const char *cmd) {
 /**
  * @brief Processes a client request and generates a response.
  *
- * This function processes a client request, generates a response, and sets the response code.
- * The request is parsed into a command vector. If the parsing fails, the function reports an error and returns -1.
- * If the parsing is successful, the function checks the command vector to determine the type of command (get, set, or del).
- * If the command is recognized, the corresponding function is called to execute the command and the response code is set.
- * If the command is not recognized, the response code is set to error (ERR) and an error message is copied to the response buffer.
- * After processing the command, the function frees the memory allocated for the command vector and the parsed arguments.
- *
  * @param req Pointer to the request data.
  * @param reqlen The length of the request data.
  * @param rescode Pointer to the response code. It will be set based on the result of the command.
@@ -528,8 +522,9 @@ static int32_t do_request(const uint8_t *req, const uint32_t reqlen,
  * @brief Tries to process one request from the client.
  *
  * This function attempts to parse a request from the client's buffer. If the buffer does not contain enough data,
- * the function will return false, indicating that it will retry in the next iteration. If the buffer contains a complete
- * request, the function will generate a response, update the connection's state, and remove the processed request from the buffer.
+ * the function will return false, indicating that it will retry in the next iteration.\n
+ * If the buffer contains a complete request, the function will generate a response, update the connection's state,
+ * and remove the processed request from the buffer.
  *
  * @param conn Pointer to the connection structure.
  * @return True if the request was fully processed and the connection's state is \p STATE_REQ, false otherwise.

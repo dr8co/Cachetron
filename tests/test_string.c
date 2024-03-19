@@ -319,7 +319,6 @@ void string_swap_returns_false_for_nullptr() {
 void string_functions_do_not_crash_for_nullptr() {
     string_free(nullptr);
     assert(!string_push_back(nullptr, 'a'));
-    assert(!string_resize(nullptr, 10));
     assert(string_at(nullptr, 10) == '\0');
     string_pop_back(nullptr);
 
