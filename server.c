@@ -73,7 +73,7 @@ enum {
  *
  * This structure is used to manage a connection in the server.
  */
-typedef struct Conn {
+struct Conn {
     int fd;                      ///< The file descriptor of the connection.
     uint32_t state;              ///< The current state of the connection.
 
@@ -83,7 +83,9 @@ typedef struct Conn {
     size_t wbuf_size;            ///< The size of the write buffer.
     size_t wbuf_sent;            ///< The amount of data already sent from the write buffer.
     uint8_t wbuf[4 + k_max_msg]; ///< The write buffer, used to store outgoing data.
-} Conn;
+};
+
+typedef struct Conn Conn;
 
 /**
  * @brief Initializes a connection structure.
@@ -99,8 +101,8 @@ static void conn_init(Conn *conn) {
     conn->wbuf_size = 0;
     conn->wbuf_sent = 0;
 
-    memset(conn->rbuf, 0, sizeof(conn->rbuf)); // initialize rbuf
-    memset(conn->wbuf, 0, sizeof(conn->wbuf)); // initialize wbuf
+    memset(conn->rbuf, 0, sizeof(conn->rbuf));
+    memset(conn->wbuf, 0, sizeof(conn->wbuf));
 }
 
 static void report_error(const char *msg) {
@@ -115,14 +117,11 @@ static void die(const char *msg) {
 /**
  * @brief Sets a file descriptor to non-blocking mode.
  *
- * This function sets a file descriptor to non-blocking mode using the @p fcntl system call.\n
- * If an error occurs during the process, the program will terminate with an error message.
- *
  * @param fd The file descriptor to be set to non-blocking mode.
  */
 static void fd_set_nb(const int fd) {
     // get the current flags
-    int flags = fcntl(fd, F_GETFL, 0);
+    const int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) die("fcntl error");
 
     // set the non-blocking flag
@@ -146,9 +145,6 @@ static void conn_put(ptr_vector *fd2conn, Conn *conn) {
 
 /**
  * @brief Accepts a new connection and adds it to the connection vector.
- *
- * This function accepts a new connection from a client, sets the connection to non-blocking mode,
- * initializes a new connection structure, and adds it to the connection vector.
  *
  * @param fd2conn Pointer to the vector of connections.
  * @param fd The file descriptor of the server socket.
@@ -190,17 +186,17 @@ static void state_res(Conn *conn);
 /**
  * @brief Parses a request from a client.
  *
- * This function parses a request from a client. The request is expected to be in a specific format:\n
- * - The first 4 bytes represent the number of arguments in the request.\n
- * - Each argument is represented by 4 bytes for the length of the argument, followed by the argument itself.\n
- *
- * If the request is not in the expected format, or if there is trailing data after the last argument, the function will return -1.\n
- * If the request is successfully parsed, the function will return 0 and the arguments will be stored in the output vector.\n
- *
  * @param data Pointer to the data to be parsed.
  * @param len The length of the data to be parsed.
  * @param out Pointer to the vector where the parsed arguments will be stored.
  * @return 0 if the operation was successful, -1 otherwise.
+ *
+ * @note The request is expected to be in a specific format:\n
+ * - The first 4 bytes represent the number of arguments in the request.\n
+ * - Each argument is represented by 4 bytes for the length of the argument, followed by the argument itself.\n
+ *
+ * @note If the request is not in the expected format, or if there is trailing data after the last argument, the function will return -1.\n
+ * If the request is successfully parsed, the function will return 0 and the arguments will be stored in the output vector.\n
  */
 static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out) {
     if (len < 4) return -1;
@@ -226,7 +222,6 @@ static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out)
         string_append_cstr_range(ptr_vector_at(out, j++), (char *) &data[pos + 4], sz);
         pos += 4 + sz;
     }
-
     if (pos != len) {
         // There is trailing data after the last argument
         for (size_t i = 0; i < ptr_vector_size(out); ++i)
@@ -263,9 +258,6 @@ typedef struct Entry Entry;
 /**
  * @brief Initializes an Entry structure.
  *
- * This function initializes an Entry structure by creating a new \p HNode and
- * allocating memory for the key and value strings.
- *
  * @param entry Pointer to the Entry structure to be initialized.
  */
 static void entry_init(Entry *entry) {
@@ -276,10 +268,6 @@ static void entry_init(Entry *entry) {
 
 /**
  * @brief Frees an Entry structure.
- *
- * This function frees an Entry structure by freeing the memory allocated for
- * the key and value strings.\n
- * The \p HNode is not freed as it is not dynamically allocated.
  *
  * @param entry Pointer to the Entry structure to be freed.
  */
@@ -300,9 +288,6 @@ static void entry_free(const Entry *entry) {
 /**
  * @brief Compares two hash nodes for equality.
  *
- * This function compares two hash nodes for equality by comparing their keys.\n
- * The keys are retrieved from the containing \p Entry structures using the \p container_of macro.
- *
  * @param lhs Pointer to the first hash node.
  * @param rhs Pointer to the second hash node.
  * @return True if the keys of the hash nodes are equal, false otherwise.
@@ -315,7 +300,6 @@ static bool entry_eq(const HNode *lhs, const HNode *rhs) {
 /**
  * @brief Calculates a hash value for a given data using the FNV-1a hash algorithm.
  *
- * This function implements the FNV-1a hash algorithm, which is an algorithm used to hash data.\n
  * FNV-1a has excellent dispersion for short strings and is relatively fast on modern processors.
  *
  * @param data Pointer to the data to be hashed.
@@ -521,13 +505,14 @@ static int32_t do_request(const uint8_t *req, const uint32_t reqlen,
 /**
  * @brief Tries to process one request from the client.
  *
- * This function attempts to parse a request from the client's buffer. If the buffer does not contain enough data,
- * the function will return false, indicating that it will retry in the next iteration.\n
- * If the buffer contains a complete request, the function will generate a response, update the connection's state,
- * and remove the processed request from the buffer.
- *
  * @param conn Pointer to the connection structure.
  * @return True if the request was fully processed and the connection's state is \p STATE_REQ, false otherwise.
+ *
+ * @note This function attempts to parse a request from the client's buffer.
+ * If the buffer does not contain enough data, the function will return false,
+ * indicating that it will retry in the next iteration.\n
+ * If the buffer contains a complete request, the function will generate a response, update the connection's state,
+ * and remove the processed request from the buffer.
  */
 static bool try_one_request(Conn *conn) {
     if (conn->rbuf_size < 4) {
@@ -748,7 +733,6 @@ int main() {
             pfd2.events = pfd2.events | POLLERR;
             vector_push_back(poll_args, &pfd2);
         }
-
         // Poll for events
         rv = poll(vector_data(poll_args), vector_size(poll_args), 1000);
         if (rv < 0) die("poll");
@@ -768,12 +752,10 @@ int main() {
                 }
             }
         }
-
         // Accept new connections
         if (((struct pollfd *) vector_at(poll_args, 0))->revents)
             (void) accept_new_conn(fd2conn, fd);
     }
-
     // Free the memory used by the connection vector and the poll arguments
     vector_free(poll_args);
     ptr_vector_free(fd2conn);

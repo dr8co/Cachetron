@@ -24,8 +24,6 @@ enum : size_t {
 /**
  * @brief Reports an error message.
  *
- * This function is used to report an error message to the user.
- *
  * @param msg The error message to be reported.
  */
 static void report_error(const char *msg) {
@@ -34,9 +32,7 @@ static void report_error(const char *msg) {
 
 /**
  * @brief Terminates the program and prints an error message.
- * 
- * This function is used to gracefully terminate the program and display an error message.
- * 
+ *
  * @param msg The error message to be displayed.
  */
 static void die(const char *msg) {
@@ -94,6 +90,16 @@ static int32_t write_all(const int fd, const char *buf, size_t n) {
  * @param fd The file descriptor to send the request to.
  * @param cmd The command vector containing the commands to be sent.
  * @return The number of bytes written on success, or -1 on failure.
+ *
+ * @note The format of the request is as follows:
+ *  - 4 bytes: the total length of the message, including the length itself and the number of commands.
+ *  - 4 bytes: the number of commands in the message.
+ *  - 4 bytes: the length of the first command.
+ *  - n bytes: the first command.
+ *  - ...
+ *  - 4 bytes: the length of the last command.
+ *  - n bytes: the last command.
+
  */
 static int32_t send_req(const int fd, const ptr_vector *cmd) {
     uint32_t len = 4;
@@ -144,7 +150,6 @@ static int32_t read_res(const int fd) {
         report_error(errno == 0 ? "read_full() error" : "read() error");
         return err;
     }
-
     // Get the length of the reply
     uint32_t len = 0;
     memcpy(&len, rbuf, 4); // Assume little endian
@@ -152,14 +157,12 @@ static int32_t read_res(const int fd) {
         report_error("too long"); // The message is too long
         return -1;
     }
-
     // Read the reply
     err = read_full(fd, &rbuf[4], len);
     if (err) {
         report_error("read() error");
         return err;
     }
-
     // If the reply is too short, report an error
     if (len < 4) {
         report_error("bad response");
