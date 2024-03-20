@@ -1,6 +1,6 @@
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
+#include <stdint.h>
 #include "string_c.h"
 
 /**
@@ -80,13 +80,52 @@ static bool string_resize(string_c *const restrict s, size_t size) {
 
             // Update the string's data pointer
             s->data = (char *) temp;
-            // Set the new capacity to the new size, and fill the rest of the string with null characters
-            memset(s->data + s->size, '\0', s->capacity - s->size);
+            // Set the new capacity to the new size, and initialize the new memory to zero
             s->capacity = size;
+            memset(s->data + s->size, '\0', s->capacity - s->size);
         }
         return true;
     }
 
+    return false;
+}
+
+/**
+ * @brief Inserts a specified number of characters from a C-string into a string at a specified index.
+ *
+ * @param s A pointer to the string where the characters will be inserted.
+ * @param cstr The C-string from which the characters will be copied.
+ * @param index The index at which the characters will be inserted.
+ * @param count The number of characters to be copied from the C-string to the string.
+ * @return true if the characters were successfully inserted, false otherwise.
+ *
+ * @note If the index is equal to the size of the string and the string is empty,
+ * the function will append the characters from the C-string to the string.
+ */
+bool string_insert_cstr_range(string_c *const restrict s, const char *const restrict cstr, const size_t index,
+                              const size_t count) {
+    if (s && cstr) {
+        if (!count) return true;
+        if (count <= strlen(cstr)) {
+            // The index must be within the bounds of the string
+            if (index < s->size) {
+                // Resize the string if necessary
+                if (s->size + count >= s->capacity) {
+                    if (!string_resize(s, s->size + count)) return false;
+                }
+                // Move the characters after the index to make room for the C-string
+                memmove(s->data + (index + count) * sizeof(char), s->data + index * sizeof(char),
+                        (s->size - index) * sizeof(char));
+
+                // Copy the C-string into the string
+                memcpy(s->data + index * sizeof(char), cstr, count * sizeof(char));
+                s->size += count;
+
+                return true;
+            }
+            if (index == s->size) return string_append_cstr_range(s, cstr, count);
+        }
+    }
     return false;
 }
 
@@ -98,33 +137,10 @@ static bool string_resize(string_c *const restrict s, size_t size) {
  * @param cstr The C-string to be inserted.
  * @return true if the C-string was successfully inserted, false otherwise.
  */
-bool string_insert_cstr(string_c *const restrict s, const size_t index, const char *const restrict cstr) {
-    if (s) {
-        if (cstr) {
-            const size_t len = strlen(cstr);
-            if (len) {
-                // The index must be within the bounds of the string
-                if (index < s->size) {
-                    // Resize the string if necessary
-                    if (s->size + len > s->capacity) {
-                        if (!string_resize(s, s->size + len)) return false;
-                    }
-                    // Move the characters after the index to make room for the C-string
-                    memmove(s->data + (index + len) * sizeof(char), s->data + index * sizeof(char),
-                            (s->size - index) * sizeof(char));
-
-                    // Copy the C-string into the string
-                    memcpy(s->data + index * sizeof(char), cstr, len * sizeof(char));
-                    s->size += len;
-
-                    return true;
-                }
-                if (index == 0 && s->size == 0) return string_append_cstr(s, cstr);
-            }
-        }
-    }
-    return false;
+bool string_insert_cstr(string_c *const restrict s, const char *restrict cstr, const size_t index) {
+    return cstr && string_insert_cstr_range(s, cstr, index, strlen(cstr));
 }
+
 
 /**
  * @brief Appends a character to the end of a string.
@@ -181,6 +197,26 @@ void string_pop_back(string_c *const restrict s) {
  */
 bool string_empty(const string_c *const restrict s) {
     return s == nullptr || s->size == 0;
+}
+
+/**
+ * @brief Retrieves the last character of a string.
+ *
+ * @param s A pointer to the string.
+ * @return The last character of the string if the string is valid and not empty, or the null character otherwise.
+ */
+char string_back(const string_c *const restrict s) {
+    return s && s->size ? s->data[s->size - 1] : '\0';
+}
+
+/**
+ * @brief Retrieves the first character of a string.
+ *
+ * @param s A pointer to the string.
+ * @return The first character of the string if the string is valid and not empty, or the null character otherwise.
+ */
+char string_front(const string_c *const restrict s) {
+    return s && s->size ? s->data[0] : '\0';
 }
 
 /**
@@ -292,6 +328,41 @@ bool string_insert(string_c *const restrict s, const size_t index, const char c)
 }
 
 /**
+ * @brief Inserts a specified number of characters from a substring into a string at a specified index.
+ *
+ * @param s A pointer to the string where the characters will be inserted.
+ * @param sub A pointer to the substring from which the characters will be copied.
+ * @param index The index at which the characters will be inserted.
+ * @param count The number of characters to be copied from the substring to the string.
+ * @return true if the characters were successfully inserted, false otherwise.
+ *
+ * @note If the index is equal to the size of the string and the string is empty,
+ * the function will append the characters from the substring to the string.
+ */
+bool string_insert_range(string_c *const restrict s, const string_c *const restrict sub, const size_t index,
+                         const size_t count) {
+    if (s && sub) {
+        if (!count) return true;
+        if (count <= sub->size) {
+            if (index < s->size) {
+                if (s->size + count >= s->capacity) {
+                    if (!string_resize(s, s->size + count)) return false;
+                }
+                memmove(s->data + (index + count) * sizeof(char), s->data + index * sizeof(char),
+                        (s->size - index) * sizeof(char));
+
+                memcpy(s->data + index * sizeof(char), sub->data, count * sizeof(char));
+                s->size += count;
+
+                return true;
+            }
+            if (index == 0 && s->size == 0) return string_append_range(s, sub, count);
+        }
+    }
+    return false;
+}
+
+/**
  * @brief Modifies the character at a given index in the string.
  *
  * @param s A pointer to the string where the character will be modified.
@@ -301,6 +372,10 @@ bool string_insert(string_c *const restrict s, const size_t index, const char c)
 void string_set(const string_c *const restrict s, const size_t index, const char c) {
     if (s && c != '\0' && index < s->size)
         s->data[index] = c;
+}
+
+bool string_insert_string(string_c *const restrict s, const string_c *const restrict sub, const size_t index) {
+    return sub && string_insert_range(s, sub, index, sub->size);
 }
 
 /**
@@ -445,13 +520,13 @@ bool string_append_cstr(string_c *const restrict s, const char *const restrict c
  *
  * @param s A pointer to the string to be converted.
  * @return A pointer to the newly created C-string, or NULL if the string could not be converted.
- * @note The returned C-string must be freed by the caller.\n \n
+ * @note The returned C-string must be freed by the caller.\n
  * It is better to use \p string_copy_buffer if the C-string is only needed temporarily.
  */
 char *string_cstr(const string_c *const restrict s) {
     if (s) {
         // Allocate memory for the C-string
-        char *cstr = (char *) malloc((s->size + 1) * sizeof(char));
+        char *cstr = malloc((s->size + 1) * sizeof(char));
         if (cstr) {
             // Copy the characters from the string to the C-string
             memcpy(cstr, s->data, s->size);
@@ -547,6 +622,344 @@ bool string_swap(string_c *const restrict s1, string_c *const restrict s2) {
         *s2 = temp;
 
         return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Finds the last occurrence of a character in a string.
+ *
+ * @param s A pointer to the string.
+ * @param c The character to be found.
+ * @return The index of the last occurrence of the character in the string, or \p SIZE_MAX if the character was not found.
+ */
+size_t string_find_last_of(const string_c *const restrict s, const char c) {
+    if (s && c != '\0') {
+        for (size_t i = s->size; i > 0; --i) {
+            if (s->data[i - 1] == c)
+                return i - 1;
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Finds the last occurrence of a character that does not match the specified character in a string.
+ *
+ * @param s A pointer to the string.
+ * @param c The character to be compared against.
+ * @return The index of the last occurrence of a character that does not match the specified character in the string,
+ * or \p SIZE_MAX if all characters match or the string is invalid.
+ */
+size_t string_find_last_not_of(const string_c *const restrict s, const char c) {
+    if (s && c != '\0') {
+        for (size_t i = s->size; i > 0; --i) {
+            if (s->data[i - 1] != c)
+                return i - 1;
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Finds the first occurrence of a character in a string, starting from a specified index.
+ *
+ * @param s A pointer to the string.
+ * @param c The character to be found.
+ * @param start The index from which the search will start.
+ * @return The index of the first occurrence of the character in the string, or \p SIZE_MAX if the character was not found.
+ */
+size_t string_find_first_from(const string_c *const restrict s, const char c, const size_t start) {
+    if (s && c != '\0' && start < s->size) {
+        for (size_t i = start; i < s->size; ++i) {
+            if (s->data[i] == c)
+                return i;
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Finds the first occurrence of a character in a string.
+ *
+ * @param s A pointer to the string.
+ * @param c The character to be found.
+ * @return The index of the first occurrence of the character in the string, or \p SIZE_MAX if the character was not found.
+ */
+size_t string_find_first_of(const string_c *const restrict s, const char c) {
+    return string_find_first_from(s, c, 0);
+}
+
+/**
+ * @brief Finds the first occurrence of a character that does not match the specified character in a string.
+ *
+ * @param s A pointer to the string.
+ * @param c The character to be compared against.
+ * @return The index of the first occurrence of a character that does not match the specified character in the string,
+ * or \p SIZE_MAX if all characters match or the string is invalid.
+ */
+size_t string_find_first_not_of(const string_c *const restrict s, const char c) {
+    if (s && c != '\0') {
+        for (size_t i = 0; i < s->size; ++i) {
+            if (s->data[i] != c)
+                return i;
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Checks if a string contains a specified character.
+ * @param s A pointer to the string.
+ * @param c The character to be found.
+ * @return True if the string contains the character, false otherwise.
+ */
+bool string_contains_char(const string_c *const restrict s, const char c) {
+    return string_find_first_of(s, c) != SIZE_MAX;
+}
+
+/**
+ * @brief Finds the first occurrence of a substring in a string, starting from a specified index.
+ *
+ * @param s A pointer to the string.
+ * @param sub A pointer to the substring to be found.
+ * @param start The index from which the search will start.
+ * @return The index of the first occurrence of the substring in the string, or \p SIZE_MAX if the substring was not found.
+ */
+size_t string_find_substr_from(const string_c *const restrict s, const string_c *const restrict sub,
+                               const size_t start) {
+    if (s && sub && start < s->size) {
+        if (sub->size == 0) return start;
+        if (sub->size > s->size) return SIZE_MAX;
+
+        for (size_t i = start; i < s->size - sub->size + 1; ++i) {
+            if (s->data[i] == sub->data[0]) {
+                bool found = true;
+                for (size_t j = 1; j < sub->size; ++j) {
+                    if (s->data[i + j] != sub->data[j]) {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) return i;
+            }
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Finds the first occurrence of a substring in a string.
+ *
+ * @param s A pointer to the string.
+ * @param sub A pointer to the substring to be found.
+ * @return The index of the first occurrence of the substring in the string, or \p SIZE_MAX if the substring was not found.
+ */
+size_t string_find_substr(const string_c *const restrict s, const string_c *const restrict sub) {
+    return string_find_substr_from(s, sub, 0);
+}
+
+/**
+ * @brief Finds the last occurrence of a substring in a string.
+ *
+ * @param s A pointer to the string.
+ * @param sub A pointer to the substring to be found.
+ * @return The index of the last occurrence of the substring in the string, or \p SIZE_MAX if the substring was not found.
+ */
+size_t string_rfind_substr(const string_c *const restrict s, const string_c *const restrict sub) {
+    if (s && sub) {
+        if (sub->size == 0) return s->size;
+        if (sub->size > s->size) return SIZE_MAX;
+
+        for (size_t i = s->size - sub->size; i > 0; --i) {
+            if (s->data[i] == sub->data[0]) {
+                bool found = true;
+                for (size_t j = 1; j < sub->size; ++j) {
+                    if (s->data[i + j] != sub->data[j]) {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) return i;
+            }
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Finds the first occurrence of a C-string in a string, starting from a specified index.
+ *
+ * @param s A pointer to the string.
+ * @param cstr The C-string to be found.
+ * @param start The index from which the search will start.
+ * @return The index of the first occurrence of the C-string in the string, or \p SIZE_MAX if the C-string was not found.
+ */
+size_t string_find_substr_cstr_from(const string_c *const restrict s, const char *const restrict cstr,
+                                    const size_t start) {
+    if (s && cstr && start < s->size) {
+        const size_t len = strlen(cstr);
+        if (len == 0) return start;
+        if (len > s->size) return SIZE_MAX;
+
+        for (size_t i = start; i < s->size - len + 1; ++i) {
+            if (s->data[i] == cstr[0]) {
+                bool found = true;
+                for (size_t j = 1; j < len; ++j) {
+                    if (s->data[i + j] != cstr[j]) {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) return i;
+            }
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Finds the last occurrence of a C-string in a string.
+ *
+ * @param s A pointer to the string.
+ * @param cstr The C-string to be found.
+ * @return The index of the last occurrence of the C-string in the string, or \p SIZE_MAX if the C-string was not found.
+ */
+size_t string_rfind_substr_cstr(const string_c *const restrict s, const char *const restrict cstr) {
+    if (s && cstr) {
+        const size_t len = strlen(cstr);
+        if (len == 0) return s->size;
+        if (len > s->size) return SIZE_MAX;
+
+        for (size_t i = s->size - len; i > 0; --i) {
+            if (s->data[i] == cstr[0]) {
+                bool found = true;
+                for (size_t j = 1; j < len; ++j) {
+                    if (s->data[i + j] != cstr[j]) {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) return i;
+            }
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief Finds the first occurrence of a C-string in a string.
+ *
+ * @param s A pointer to the string.
+ * @param cstr The C-string to be found.
+ * @return The index of the first occurrence of the C-string in the string, or \p SIZE_MAX if the C-string was not found.
+ */
+size_t string_find_substr_cstr(const string_c *const restrict s, const char *const restrict cstr) {
+    return string_find_substr_cstr_from(s, cstr, 0);
+}
+
+/**
+ * @brief Checks if a string contains a specified substring.
+ *
+ * @param s A pointer to the string.
+ * @param sub A pointer to the substring to be found.
+ * @return True if the string contains the substring, false otherwise.
+ */
+bool string_contains(const string_c *const restrict s, const string_c *const restrict sub) {
+    return string_find_substr(s, sub) != SIZE_MAX;
+}
+
+/**
+ * @brief Checks if a string contains a specified C-string.
+ *
+ * @param s A pointer to the string.
+ * @param cstr The C-string to be found.
+ * @return True if the string contains the C-string, false otherwise.
+ */
+bool string_contains_cstr(const string_c *const restrict s, const char *const restrict cstr) {
+    return string_find_substr_cstr(s, cstr) != SIZE_MAX;
+}
+
+/**
+ * @brief Checks if a string starts with a specified substring.
+ *
+ * @param s A pointer to the string.
+ * @param sub A pointer to the substring to be checked.
+ * @return True if the string starts with the substring, false otherwise.
+ */
+bool string_starts_with(const string_c *const restrict s, const string_c *const restrict sub) {
+    return string_find_substr(s, sub) == 0;
+}
+
+/**
+ * @brief Checks if a string starts with a specified C-string.
+ *
+ * @param s A pointer to the string.
+ * @param cstr The C-string to be checked.
+ * @return True if the string starts with the C-string, false otherwise.
+ */
+bool string_starts_with_cstr(const string_c *const restrict s, const char *const restrict cstr) {
+    return string_find_substr_cstr(s, cstr) == 0;
+}
+
+/**
+ * @brief Checks if a string ends with a specified substring.
+ *
+ * @param s A pointer to the string.
+ * @param sub A pointer to the substring to be checked.
+ * @return True if the string ends with the substring, false otherwise.
+ */
+bool string_ends_with(const string_c *const restrict s, const string_c *const restrict sub) {
+    return s && sub && string_rfind_substr(s, sub) == s->size - sub->size;
+}
+
+/**
+ * @brief Checks if a string ends with a specified C-string.
+ *
+ * @param s A pointer to the string.
+ * @param cstr The C-string to be checked.
+ * @return True if the string ends with the C-string, false otherwise.
+ */
+bool string_ends_with_cstr(const string_c *const restrict s, const char *const restrict cstr) {
+    return s && cstr && string_rfind_substr_cstr(s, cstr) == s->size - strlen(cstr);
+}
+
+
+/**
+ * @brief Shrinks the string to a specified size.
+ *
+ * @param s A pointer to the string to be shrunk.
+ * @param size The new size for the string.
+ * @return true if the string was successfully shrunk, false otherwise.
+ *
+ * @note Extra characters are removed from the end of the string.
+ */
+bool string_shrink(string_c *const restrict s, const size_t size) {
+    if (s && size < s->size) {
+        s->size = size;
+        s->data[size] = '\0';
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Shrinks the string to fit its size.
+ *
+ * @param s A pointer to the string to be shrunk.
+ * @return true if the string was successfully shrunk or if shrinking was unnecessary, false otherwise.
+ */
+bool string_shrink_to_fit(string_c *const restrict s) {
+    if (s) {
+        // If the string is empty, or if the size is equal to the capacity, no resizing is necessary
+        if (!s->size || s->size == s->capacity) return true;
+
+        char *temp = realloc(s->data, s->size * sizeof(char));
+        if (temp) {
+            s->data = temp;
+            s->capacity = s->size;
+            return true;
+        }
     }
     return false;
 }
