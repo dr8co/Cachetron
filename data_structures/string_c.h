@@ -24,6 +24,8 @@ string_c *string_new();
 
 void string_free(string_c *restrict s);
 
+bool string_reserve(string_c * restrict s, size_t size);
+
 bool string_push_back(string_c *restrict s, char c);
 
 char string_at(const string_c *restrict s, size_t index);
