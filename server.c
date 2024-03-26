@@ -253,6 +253,7 @@ struct Entry {
     string_c *key;     ///< The key of the hash map entry.
     string_c *value;   ///< The value of the hash map entry.
 };
+
 typedef struct Entry Entry;
 
 /**
@@ -333,14 +334,124 @@ static uint64_t fnv1a_hash(const uint8_t *data, const size_t len) {
 }
 
 /**
- * @brief Retrieves a value from the hash map based on the provided key.
- *
- * @param cmd Pointer to the command vector. The second element is expected to be the key.
- * @param res Pointer to the response buffer where the value will be copied if the key is found.
- * @param reslen Pointer to the response length. It will be set to the length of the value if the key is found.
- * @return Response code. It will be OK if the key is found, non-existent (NX) otherwise.
+ * @brief Enum representing various error codes.
  */
-static uint32_t do_get(const ptr_vector *cmd, uint8_t *res, uint32_t *reslen) {
+enum {
+    ERR_UNKNOWN = 1, ///< Represents an unknown error.
+    ERR_2BIG = 2,    ///< Represents an error when the data is too big.
+};
+
+/**
+ * @brief Enum representing various serialization constants.
+ */
+enum {
+    SER_NIL = 0, ///< Represents a nil value.
+    SER_ERR = 1, ///< Represents an error message.
+    SER_STR = 2, ///< Represents a string value.
+    SER_INT = 3, ///< Represents an integer value.
+    SER_ARR = 4, ///< Represents an array.
+};
+
+bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr, const size_t count) {
+    if (s) {
+        if (count == 0) return true;
+        if (cstr) {
+            // Resize the string if necessary
+            if (string_reserve(s, s->size + count)) {
+                // Copy the C-string into the string
+                memcpy(s->data + s->size * sizeof(char), cstr, count * sizeof(char));
+                s->size += count;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool string_push_back_bin(string_c *const restrict s, const char c) {
+    if (s) {
+        if (s->size == s->capacity) {
+            if (!string_reserve(s, s->capacity * 2)) return false;
+        }
+        s->data[s->size++] = c;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Appends a nil value to the output string.
+ *
+ * @param out Pointer to the output string.
+ */
+static void out_nil(string_c *out) {
+    string_push_back_bin(out, SER_NIL);
+}
+
+/**
+ * @brief Appends a string value to the output string.
+ *
+ * @param out Pointer to the output string.
+ * @param val Pointer to the string value to be appended.
+ */
+static void out_str(string_c *out, const string_c *val) {
+    string_push_back_bin(out, SER_STR);
+    uint32_t len = string_length(val);
+    string_append_cstr_range_bin(out, (char *) &len, 4);
+
+    string_append(out, val);
+}
+
+/**
+ * @brief Appends an integer value to the output string.
+ *
+ * @param out Pointer to the output string.
+ * @param val The integer value to be appended.
+ */
+static void out_int(string_c *out, int64_t val) {
+    string_push_back_bin(out, SER_INT);
+    string_append_cstr_range_bin(out, (char *) &val, 8);
+}
+
+/**
+ * @brief Appends an error message to the output string.
+ *
+ * @param out Pointer to the output string.
+ * @param code The error code.
+ * @param msg Pointer to the error message.
+ */
+static void out_err(string_c *out, int32_t code, const string_c *msg) {
+    string_push_back_bin(out, SER_ERR);
+    string_append_cstr_range_bin(out, (char *) &code, 4);
+
+    uint32_t len = string_length(msg);
+    string_append_cstr_range_bin(out, (char *) &len, 4);
+
+    string_append(out, msg);
+}
+
+/**
+ * @brief Appends an array to the output string.
+ *
+ * @param out Pointer to the output string.
+ * @param n The number of elements in the array.
+ */
+static void out_arr(string_c *out, uint32_t n) {
+    string_push_back_bin(out, SER_ARR);
+    string_append_cstr_range_bin(out, (char *) &n, 4);
+}
+
+
+/**
+ * @brief Handles the "get" command.
+ *
+ * It retrieves the value associated with the provided key from the database. \n
+ * If the key is found, it returns the associated value. Otherwise, it returns nil.
+ *
+ * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
+static void do_get(const ptr_vector *cmd, string_c *out) {
     // Create a new Entry structure and initialize it
     Entry key;
     entry_init(&key);
@@ -352,32 +463,24 @@ static uint32_t do_get(const ptr_vector *cmd, uint8_t *res, uint32_t *reslen) {
     // Look up the key in the hash map
     const HNode *node = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
     if (node) {
-        // If the key is found, copy the value to the response buffer and set the response length
         const string_c *val = container_of(node, Entry, node)->value;
-        assert(string_length(val) <= k_max_msg);
-        memcpy(res, val->data, string_length(val));
-        *reslen = (uint32_t) string_length(val);
+        out_str(out, val);
+    } else out_nil(out);
 
-        entry_free(&key);
-        return RES_OK;
-    }
-    // If the key is not found, free the Entry structure and return a non-existent (NX) response code
     entry_free(&key);
-    return RES_NX;
 }
 
 /**
- * @brief Sets a key-value pair in the hash map.
+ * @brief Handles the "set" command.
  *
- * @param cmd Pointer to the command vector.
- * The second element is expected to be the key and the third element is expected to be the value.
- * @param res, reslen Unused parameters (for consistency with other command functions).
- * @return Response code. It will be OK if the operation was successful, error (ERR) otherwise.
+ * It sets the value associated with the provided key in the database.\n
+ * If the key already exists, it updates the associated value.
+ * Otherwise, it creates a new key-value pair.
+ *
+ * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
  */
-static uint32_t do_set(const ptr_vector *cmd, const uint8_t *res, const uint32_t *reslen) {
-    (void) res;
-    (void) reslen;
-
+static void do_set(const ptr_vector *cmd, string_c *out) {
     // Create a new Entry structure and initialize it
     Entry key;
     entry_init(&key);
@@ -394,33 +497,31 @@ static uint32_t do_set(const ptr_vector *cmd, const uint8_t *res, const uint32_t
     } else {
         // If the key is not found, create a new Entry structure and insert it into the hash map
         Entry *new_entry = malloc(sizeof(Entry));
-        if (new_entry == nullptr) {
-            entry_free(&key);
-            return RES_ERR;
-        }
-        new_entry->key = string_new();
-        new_entry->value = string_new();
+        if (new_entry) {
+            new_entry->key = string_new();
+            new_entry->value = string_new();
 
-        string_swap(new_entry->key, key.key);
-        new_entry->node.hcode = key.node.hcode;
-        string_swap(new_entry->value, ptr_vector_at(cmd, 2));
-        hm_insert(&g_data.db, &new_entry->node);
+            string_swap(new_entry->key, key.key);
+            new_entry->node.hcode = key.node.hcode;
+            string_swap(new_entry->value, ptr_vector_at(cmd, 2));
+            hm_insert(&g_data.db, &new_entry->node);
+        }
     }
+    out_nil(out);
     entry_free(&key);
-    return RES_OK;
 }
 
-/**
- * @brief Deletes a key-value pair from the hash map.
- *
- * @param cmd Pointer to the command vector. The second element is expected to be the key.
- * @param res, reslen Unused parameters (for consistency with other command functions).
- * @return Response code. It will be OK if the operation was successful.
- */
-static uint32_t do_del(const ptr_vector *cmd, const uint8_t *res, const uint32_t *reslen) {
-    (void) res;
-    (void) reslen;
 
+/**
+ * @brief Handles the "del" command.
+ *
+ * It removes the key-value pair associated with the provided key from the database.\n
+ * If the key is found and successfully removed, it returns 1. Otherwise, it returns 0.
+ *
+ * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
+static void do_del(const ptr_vector *cmd, string_c *out) {
     // Create a new Entry structure and initialize it
     Entry key;
     entry_init(&key);
@@ -440,14 +541,67 @@ static uint32_t do_del(const ptr_vector *cmd, const uint8_t *res, const uint32_t
     }
     // Free the memory allocated for the key in the Entry structure
     entry_free(&key);
-    return RES_OK;
+
+    out_int(out, node ? 1 : 0);
 }
+
+/**
+ * @brief Scans a hash node and applies a function to it.
+ *
+ * @param node Pointer to the hash node to be scanned.
+ * @param arg Pointer to the argument to be passed to the function.
+ */
+static void cb_scan(const HNode *node, void *arg) {
+    auto *out = (string_c *) arg;
+    out_str(out, container_of(node, Entry, node)->key);
+}
+
 // Restore the warning about statement expressions in macros
 #if __clang__
 #pragma clang diagnostic pop
 #elif __GNUC__
 #pragma GCC diagnostic pop
 #endif
+
+
+/**
+ * @brief Scans a hash table and applies a function to each node.
+ *
+ * @param tab Pointer to the hash table to be scanned.
+ * @param f Pointer to the function to be applied to each node. The function should take a pointer to a hash node and a pointer to an argument.
+ * @param arg Pointer to the argument to be passed to the function.
+ */
+static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
+    if (tab->size == 0) return;
+
+    for (size_t i = 0; i < tab->mask + 1; ++i) {
+        HNode *node = tab->tab[i];
+        while (node) {
+            f(node, arg);
+            node = node->next;
+        }
+    }
+}
+
+/**
+ * @brief Handles the "keys" command.
+ *
+ * It sends back an array of all keys in the database.
+ *
+ * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
+ * This parameter is not used in this function.
+ * @param out Pointer to the string where the response will be stored.
+ */
+static void do_keys(const ptr_vector *cmd[[maybe_unused]
+
+],
+string_c *out
+) {
+out_arr(out, hm_size(
+&g_data.db));
+h_scan(&g_data.db.ht1, (void (*)(HNode *, void *)) &cb_scan, out);
+h_scan(&g_data.db.ht2, (void (*)(HNode *, void *)) &cb_scan, out);
+}
 
 /**
  * @brief Compares a string with a command string, ignoring case.
@@ -460,46 +614,33 @@ static bool cmd_is(const string_c *word, const char *cmd) {
     return string_case_compare_cstr(word, cmd);
 }
 
+
 /**
  * @brief Processes a client request and generates a response.
  *
- * @param req Pointer to the request data.
- * @param reqlen The length of the request data.
- * @param rescode Pointer to the response code. It will be set based on the result of the command.
- * @param res Pointer to the response buffer where the result of the command or an error message will be copied.
- * @param reslen Pointer to the response length. It will be set to the length of the result or error message.
- * @return 0 if the operation was successful, -1 otherwise.
+ * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
  */
-static int32_t do_request(const uint8_t *req, const uint32_t reqlen,
-                          uint32_t *rescode, uint8_t *res, uint32_t *reslen) {
-    ptr_vector *cmd = ptr_vector_new();
-
-    // Parse the request into a command vector
-    if (parse_req(req, reqlen, cmd) != 0) {
-        report_error("bad request");
-        ptr_vector_free(cmd);
-        return -1;
-    }
+static void do_request(const ptr_vector *cmd, string_c *out) {
     // Check the command vector to determine the type of command
-    if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "get")) {
-        *rescode = do_get(cmd, res, reslen);
+    if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "keys")) {
+        do_keys(cmd, out);
+    } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "get")) {
+        do_get(cmd, out);
     } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "set")) {
-        *rescode = do_set(cmd, res, reslen);
+        do_set(cmd, out);
     } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "del")) {
-        *rescode = do_del(cmd, res, reslen);
+        do_del(cmd, out);
     } else {
         // cmd is not recognized
-        *rescode = RES_ERR;
-        const char *msg = "Unknown cmd";
-        strcpy((char *) res, msg);
-        *reslen = strlen(msg);
+        string_c *tmp = string_new();
+        string_append_cstr(tmp, "Unknown cmd");
+        out_err(out, ERR_UNKNOWN, tmp);
+        string_free(tmp);
     }
     // Free the memory allocated for the command vector and the parsed arguments
-    for (size_t i = 0; i < ptr_vector_size(cmd); ++i)
-        string_free(ptr_vector_at(cmd, i));
-
-    ptr_vector_free(cmd);
-    return 0;
+    // for (size_t i = 0; i < ptr_vector_size(cmd); ++i)
+    // string_free(ptr_vector_at(cmd, i));
 }
 
 /**
@@ -532,20 +673,30 @@ static bool try_one_request(Conn *conn) {
         // The buffer does not contain the complete request
         return false;
     }
-
     // Try to process the request and generate a response
-    uint32_t rescode = 0;
-    uint32_t wlen = 0;
-    const int32_t err = do_request(&conn->rbuf[4], len, &rescode, &conn->wbuf[4 + 4], &wlen);
-    if (err) {
-        // If an error occurred while processing the request, set the connection state to STATE_END
+    ptr_vector *cmd = ptr_vector_new();
+    if (parse_req(&conn->rbuf[4], len, cmd) != 0) {
+        report_error("bad request");
         conn->state = STATE_END;
         return false;
     }
+    // Got one request, generate the response.
+    string_c *out = string_new();
+    do_request(cmd, out);
+
+    // pack the response into the buffer
+    if (4 + string_length(out) > k_max_msg) {
+        string_clear(out);
+        string_c *tmp = string_new();
+        string_append_cstr(tmp, "Response is too big");
+        out_err(out, ERR_2BIG, tmp);
+        string_free(tmp);
+    }
+
     // Copy the response length to the response buffer
-    wlen += 4;
+    const uint32_t wlen = string_length(out);
     memcpy(&conn->wbuf[0], &wlen, 4);
-    memcpy(&conn->wbuf[4], &rescode, 4);
+    memcpy(&conn->wbuf[4], out->data, string_length(out));
     conn->wbuf_size = 4 + wlen;
 
     // Remove the processed request from the buffer
@@ -558,6 +709,13 @@ static bool try_one_request(Conn *conn) {
     conn->rbuf_size = remain;
     conn->state = STATE_RES;
     state_res(conn);
+
+    string_free(out);
+    for (size_t i = 0; i < ptr_vector_size(cmd); ++i) {
+        const auto ptr = (string_c *) ptr_vector_at(cmd, i);
+        if (ptr) string_free(ptr);
+    }
+    ptr_vector_free(cmd);
 
     return conn->state == STATE_REQ;
 }
