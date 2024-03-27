@@ -12,26 +12,7 @@
 #include "data_structures/string_c.h"
 #include "data_structures/vector_c.h"
 #include "data_structures/hashtable.h"
-
-/**
- * @brief A macro that gets the containing structure of a member.
- *
- * This macro is used to retrieve the containing structure of a member variable.
- * It's a common idiom in C programming, especially when dealing with data structures
- * and type abstraction.\n
- * It calculates the address of the structure by subtracting
- * the offset of the member within the structure from the address of the member itself.\n
- *
- * This definition was taken from the Linux kernel source code.
- *
- * @param ptr Pointer to the member.
- * @param type Type of the container struct this is embedded in.
- * @param member Name of the member within the struct.
- * @return Pointer to the containing structure.
- */
-#define container_of(ptr, type, member) ({                  \
-    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-    (type *)( (char *)__mptr - offsetof(type, member) );})
+#include "common.h"
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
 #if __GNUC__ >= 13 || __clang_major__ >= 19
@@ -42,8 +23,6 @@ enum : size_t {
     k_max_msg = 4096, ///< The maximum message size
     k_max_args = 1024 ///< The maximum number of arguments
 };
-
-#define constexpr const
 #endif
 
 /**
@@ -297,59 +276,12 @@ static bool entry_eq(const HNode *lhs, const HNode *rhs) {
     return string_compare(container_of(lhs, Entry, node)->key, container_of(rhs, Entry, node)->key);
 }
 
-
-/**
- * @brief Calculates a hash value for a given data using the FNV-1a hash algorithm.
- *
- * FNV-1a has excellent dispersion for short strings and is relatively fast on modern processors.
- *
- * @param data Pointer to the data to be hashed.
- * @param len The length of the data to be hashed.
- * @return The calculated hash value (64-bit).
- */
-static uint64_t fnv1a_hash(const uint8_t *data, const size_t len) {
-    // FNV offset basis and FNV prime are two constants used in the FNV-1a hash algorithm.
-    constexpr uint64_t FNV_offset_basis = 0xcbf29ce484222325ULL;
-    constexpr uint64_t FNV_prime[[maybe_unused]] = 0x00000100000001b3ULL;
-
-    // Initialize the hash to the FNV offset basis
-    uint64_t hash = FNV_offset_basis;
-
-    // Hash each byte in the buffer
-    for (size_t i = 0; i < len; ++i) {
-        // XOR the hash with the current byte
-        hash ^= (uint64_t) data[i];
-        // Multiply the hash by the FNV prime
-#if __NO_FNV_GCC_OPTIMIZATION__
-        // If FNV GCC optimization is not enabled, multiply the hash by the FNV prime
-        hash *= FNV_prime;
-#else
-        // If FNV GCC optimization is enabled, perform an equivalent operation that is faster on some processors
-        hash += (hash << 1) + (hash << 4) + (hash << 5) +
-                (hash << 7) + (hash << 8) + (hash << 40);
-#endif
-    }
-
-    return hash;
-}
-
 /**
  * @brief Enum representing various error codes.
  */
 enum {
     ERR_UNKNOWN = 1, ///< Represents an unknown error.
     ERR_2BIG = 2,    ///< Represents an error when the data is too big.
-};
-
-/**
- * @brief Enum representing various serialization constants.
- */
-enum {
-    SER_NIL = 0, ///< Represents a nil value.
-    SER_ERR = 1, ///< Represents an error message.
-    SER_STR = 2, ///< Represents a string value.
-    SER_INT = 3, ///< Represents an integer value.
-    SER_ARR = 4, ///< Represents an array.
 };
 
 bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr, const size_t count) {
@@ -552,7 +484,7 @@ static void do_del(const ptr_vector *cmd, string_c *out) {
  * @param arg Pointer to the argument to be passed to the function.
  */
 static void cb_scan(const HNode *node, void *arg) {
-    auto *out = (string_c *) arg;
+    string_c *out = arg;
     out_str(out, container_of(node, Entry, node)->key);
 }
 
@@ -712,7 +644,7 @@ static bool try_one_request(Conn *conn) {
 
     string_free(out);
     for (size_t i = 0; i < ptr_vector_size(cmd); ++i) {
-        const auto ptr = (string_c *) ptr_vector_at(cmd, i);
+        string_c *ptr = ptr_vector_at(cmd, i);
         if (ptr) string_free(ptr);
     }
     ptr_vector_free(cmd);
