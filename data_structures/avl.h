@@ -30,3 +30,5 @@ AVLNode *avl_fix_right(AVLNode *root);
 AVLNode *avl_fix(AVLNode *node);
 
 AVLNode *avl_del(AVLNode *node);
+
+AVLNode *avl_offset(AVLNode *node, int64_t offset);
