@@ -31,11 +31,13 @@ typedef struct HTab HTab;
  *
  * It contains two hash tables (\p ht1 and \p ht2), and a resizing position.
  */
-typedef struct HMap {
+struct HMap {
     HTab ht1;            ///< The newer hash table.
     HTab ht2;            ///< The older hash table.
     size_t resizing_pos; ///< The current position in the resizing process.
-} HMap;
+};
+
+typedef struct HMap HMap;
 
 HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *));
 
