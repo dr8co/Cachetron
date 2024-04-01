@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(Cachetron C)
+project(Cachetron C CXX)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -28,16 +28,22 @@ add_subdirectory(tests)
 
 add_executable(server
         server.c
+        common.h
+        data_structures/avl.c
+        data_structures/avl.h
         data_structures/vector_c.c
         data_structures/vector_c.h
         data_structures/string_c.c
         data_structures/string_c.h
         data_structures/hashtable.c
-        data_structures/hashtable.h)
+        data_structures/hashtable.h
+        data_structures/zset.c
+        data_structures/zset.h)
 
 add_executable(client
         client.c
         data_structures/vector_c.c
         data_structures/vector_c.h
         data_structures/string_c.c
-        data_structures/string_c.h)
+        data_structures/string_c.h
+        common.h)
