@@ -1,5 +1,8 @@
 #pragma once
 
+#if __cplusplus
+extern "C" {
+#endif
 #include <stdint.h>
 
 /**
@@ -9,8 +12,9 @@
  */
 struct HNode {
     struct HNode *next; ///< A pointer to the next node in the hash table.
-    uint64_t hcode;     ///< The hash code of the node.
+    uint64_t hcode; ///< The hash code of the node.
 };
+
 typedef struct HNode HNode;
 
 /**
@@ -20,10 +24,11 @@ typedef struct HNode HNode;
  * and the size of the hash table.
  */
 struct HTab {
-    HNode **tab;  ///< An array of pointers to nodes in the hash table.
-    size_t mask;  ///< A mask for fast modulo operations.
-    size_t size;  ///< The number of nodes in the hash table.
+    HNode **tab; ///< An array of pointers to nodes in the hash table.
+    size_t mask; ///< A mask for fast modulo operations.
+    size_t size; ///< The number of nodes in the hash table.
 };
+
 typedef struct HTab HTab;
 
 /**
@@ -32,8 +37,8 @@ typedef struct HTab HTab;
  * It contains two hash tables (\p ht1 and \p ht2), and a resizing position.
  */
 struct HMap {
-    HTab ht1;            ///< The newer hash table.
-    HTab ht2;            ///< The older hash table.
+    HTab ht1; ///< The newer hash table.
+    HTab ht2; ///< The older hash table.
     size_t resizing_pos; ///< The current position in the resizing process.
 };
 
@@ -48,3 +53,23 @@ HNode *hm_pop(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *));
 size_t hm_size(const HMap *hmap);
 
 void hm_destroy(HMap *hmap);
+
+static void init_hnode(HNode *node) {
+    node->next = NULL;
+    node->hcode = 0;
+}
+
+static void init_htab(HTab *htab) {
+    htab->tab = NULL;
+    htab->mask = 0;
+    htab->size = 0;
+}
+
+static void init_hmap(HMap *hmap) {
+    init_htab(&hmap->ht1);
+    init_htab(&hmap->ht2);
+    hmap->resizing_pos = 0;
+}
+#if __cplusplus
+    }
+#endif

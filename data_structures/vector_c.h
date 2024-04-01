@@ -1,6 +1,7 @@
 #pragma once
 #if __cplusplus
 #define restrict
+extern "C" {
 #endif
 
 
@@ -84,3 +85,7 @@ size_t ptr_vector_size(const ptr_vector *restrict v);
 size_t ptr_vector_capacity(const ptr_vector *restrict v);
 
 void ptr_vector_clear(ptr_vector *restrict v);
+
+#if __cplusplus
+    }
+#endif

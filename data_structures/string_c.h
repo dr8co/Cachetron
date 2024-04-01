@@ -1,6 +1,7 @@
 #pragma once
 #if __cplusplus
 #define restrict
+extern "C" {
 #endif
 
 #include <stddef.h>
@@ -13,9 +14,9 @@
  * When the size reaches the capacity, the string is resized to a larger capacity to accommodate more characters.
  */
 struct string_c {
-    char *data;         ///< A pointer to the character data.
-    size_t size;        ///< The number of characters in the string, not including the null character.
-    size_t capacity;    ///< The total number of characters that the string can hold.
+    char *data; ///< A pointer to the character data.
+    size_t size; ///< The number of characters in the string, not including the null character.
+    size_t capacity; ///< The total number of characters that the string can hold.
 };
 
 typedef struct string_c string_c;
@@ -24,7 +25,7 @@ string_c *string_new();
 
 void string_free(string_c *restrict s);
 
-bool string_reserve(string_c * restrict s, size_t size);
+bool string_reserve(string_c *restrict s, size_t size);
 
 bool string_push_back(string_c *restrict s, char c);
 
@@ -125,3 +126,7 @@ bool string_ends_with_cstr(const string_c *restrict s, const char *restrict cstr
 bool string_shrink(string_c *restrict s, size_t size);
 
 bool string_shrink_to_fit(string_c *restrict s);
+
+#if __cplusplus
+    }
+#endif
