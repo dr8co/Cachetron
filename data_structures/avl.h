@@ -1,4 +1,8 @@
 #pragma once
+#if __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 struct AVLNode {
@@ -11,7 +15,11 @@ struct AVLNode {
 
 typedef struct AVLNode AVLNode;
 
-void avl_init(AVLNode *node);
+static inline void avl_init(AVLNode *node) {
+    node->height = 1;
+    node->count = 1;
+    node->left = node->right = node->parent = nullptr;
+}
 
 uint32_t avl_height(const AVLNode *node);
 
@@ -29,6 +37,10 @@ AVLNode *avl_fix_right(AVLNode *root);
 
 AVLNode *avl_fix(AVLNode *node);
 
-AVLNode *avl_del(AVLNode *node);
+AVLNode *avl_del(const AVLNode *node);
 
 AVLNode *avl_offset(AVLNode *node, int64_t offset);
+
+#if __cplusplus
+    }
+#endif

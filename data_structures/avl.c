@@ -1,11 +1,5 @@
 #include "avl.h"
 
-void avl_init(AVLNode *node) {
-    node->height = 1;
-    node->count = 1;
-    node->left = node->right = node->parent = nullptr;
-}
-
 uint32_t avl_height(const AVLNode *node) {
     return node ? node->height : 0;
 }
@@ -90,7 +84,7 @@ AVLNode *avl_fix(AVLNode *node) {
 }
 
 // detach a node and returns the new root of the tree
-AVLNode *avl_del(AVLNode *node) {
+AVLNode *avl_del(const AVLNode *node) {
     if (node->right == nullptr) {
         // no right subtree, replace the node with the left subtree
         // link the left subtree to the parent
@@ -100,7 +94,8 @@ AVLNode *avl_del(AVLNode *node) {
         }
         if (parent) {
             // attach the left subtree to the parent
-            node->left = parent->left == node ? parent->left : parent->right;
+            if (parent->left == node) parent->left = node->left;
+            else parent->right = node->left;
             return avl_fix(parent);
         } else {
             // removing root?
@@ -123,7 +118,8 @@ AVLNode *avl_del(AVLNode *node) {
         }
         AVLNode *parent = node->parent;
         if (parent) {
-            victim = parent->left == node ? parent->left : parent->right;
+            if (parent->left == node) parent->left = victim;
+            else parent->right = victim;
             return root;
         } else {
             // removing root?
