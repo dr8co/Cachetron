@@ -9,6 +9,7 @@
 
 #include "data_structures/string_c.h"
 #include "data_structures/vector_c.h"
+#include "common.h"
 
 // C23 constexpr support
 #if __GNUC__ >= 13 || __clang_major__ >= 19
@@ -117,8 +118,8 @@ static int32_t send_req(const int fd, const ptr_vector *cmd) {
     size_t cur = 8; // current position in the buffer
 
     // Write the commands
-    char strbuf[k_max_msg];
     for (size_t i = 0; i < ptr_vector_size(cmd); ++i) {
+        char strbuf[k_max_msg];
         const uint32_t p = string_length(ptr_vector_at(cmd, i));
         string_copy_buffer(ptr_vector_at(cmd, i), strbuf);
 
@@ -130,14 +131,6 @@ static int32_t send_req(const int fd, const ptr_vector *cmd) {
 
     return write_all(fd, wbuf, 4 + len);
 }
-
-enum {
-    SER_NIL = 0,
-    SER_ERR = 1,
-    SER_STR = 2,
-    SER_INT = 3,
-    SER_ARR = 4,
-};
 
 static int32_t on_response(const uint8_t *data, const size_t size) {
     if (size < 1) {
@@ -187,6 +180,16 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 int64_t val = 0;
                 memcpy(&val, &data[1], 8);
                 printf("(int) %ld\n", val);
+                return 1 + 8;
+            }
+        case SER_DBL:
+            if (size < 1 + 8) {
+                report_error("bad response");
+                return -1;
+            } {
+                double val = 0;
+                memcpy(&val, &data[1], 8);
+                printf("(dbl) %g\n", val);
                 return 1 + 8;
             }
         case SER_ARR:
