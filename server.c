@@ -8,15 +8,17 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <math.h>
 
 #include "data_structures/string_c.h"
 #include "data_structures/vector_c.h"
 #include "data_structures/hashtable.h"
+#include "data_structures/zset.h"
 #include "common.h"
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
 #if __GNUC__ >= 13 || __clang_major__ >= 19
-constexpr size_t k_max_msg = 4096;  ///< The maximum message size
+constexpr size_t k_max_msg = 4096; ///< The maximum message size
 constexpr size_t k_max_args = 1024; ///< The maximum number of arguments
 #else
 enum : size_t {
@@ -220,17 +222,23 @@ static struct {
     HMap db; ///< The hash map used by the server to store key-value pairs.
 } g_data;
 
+enum {
+    T_STR = 0,
+    T_ZSET = 1,
+};
+
 /**
  * @brief Structure representing an entry in the hash map.
  *
  * This structure is used to manage an entry in the hash map used by the server to store key-value pairs.\n
- * Each entry consists of a node (used by the hash map), a key, and a value.\n
- * The key and value are represented as instances of the \p string_c data structure.
+ * Each entry consists of a key-value pair, the type of the value, and a sorted set (ZSet).
  */
 struct Entry {
-    HNode node;        ///< The node used by the hash map.
-    string_c *key;     ///< The key of the hash map entry.
-    string_c *value;   ///< The value of the hash map entry.
+    HNode node;      ///< The node used by the hash map. It is used to link the entries in the hash map.
+    string_c *key;   ///< The key of the hash map entry. It identifies the entry in the hash map.
+    string_c *value; ///< The value of the hash map entry. It is the data associated with the key.
+    uint32_t type;   ///< The type of the value. It is used to determine how to interpret the value.
+    ZSet *zset;      ///< The sorted set associated with the entry.
 };
 
 typedef struct Entry Entry;
@@ -241,9 +249,11 @@ typedef struct Entry Entry;
  * @param entry Pointer to the Entry structure to be initialized.
  */
 static void entry_init(Entry *entry) {
-    entry->node = (HNode) {};
+    init_hnode(&entry->node);
     entry->key = string_new();
     entry->value = string_new();
+    entry->type = 0;
+    entry->zset = nullptr;
 }
 
 /**
@@ -282,9 +292,12 @@ static bool entry_eq(const HNode *lhs, const HNode *rhs) {
 enum {
     ERR_UNKNOWN = 1, ///< Represents an unknown error.
     ERR_2BIG = 2,    ///< Represents an error when the data is too big.
+    ERR_TYPE = 3,    ///< Represents an error when the data type is invalid.
+    ERR_ARG = 4      ///< Represents an error when the argument is invalid.
 };
 
-bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr, const size_t count) {
+static bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr,
+                                         const size_t count) {
     if (s) {
         if (count == 0) return true;
         if (cstr) {
@@ -300,7 +313,7 @@ bool string_append_cstr_range_bin(string_c *const restrict s, const char *const 
     return false;
 }
 
-bool string_push_back_bin(string_c *const restrict s, const char c) {
+static bool string_push_back_bin(string_c *const restrict s, const char c) {
     if (s) {
         if (s->size == s->capacity) {
             if (!string_reserve(s, s->capacity * 2)) return false;
@@ -325,13 +338,14 @@ static void out_nil(string_c *out) {
  *
  * @param out Pointer to the output string.
  * @param val Pointer to the string value to be appended.
+ * @param size The size of the string value.
  */
-static void out_str(string_c *out, const string_c *val) {
+static void out_str(string_c *out, const string_c *val, const size_t size) {
     string_push_back_bin(out, SER_STR);
-    uint32_t len = string_length(val);
+    uint32_t len = size;
     string_append_cstr_range_bin(out, (char *) &len, 4);
 
-    string_append(out, val);
+    string_append_cstr_range_bin(out, val->data, size);
 }
 
 /**
@@ -342,6 +356,11 @@ static void out_str(string_c *out, const string_c *val) {
  */
 static void out_int(string_c *out, int64_t val) {
     string_push_back_bin(out, SER_INT);
+    string_append_cstr_range_bin(out, (char *) &val, 8);
+}
+
+static void out_dbl(string_c *out, double val) {
+    string_push_back_bin(out, SER_DBL);
     string_append_cstr_range_bin(out, (char *) &val, 8);
 }
 
@@ -373,6 +392,17 @@ static void out_arr(string_c *out, uint32_t n) {
     string_append_cstr_range_bin(out, (char *) &n, 4);
 }
 
+static void *begin_arr(string_c *out) {
+    string_push_back_bin(out, SER_ARR);
+    string_append_cstr_range_bin(out, "\0\0\0\0", 4);
+    return (void *) (string_length(out) - 4);
+}
+
+static void end_arr(const string_c *out, void *ctx, const uint32_t n) {
+    const size_t pos = (size_t) ctx;
+    assert(out->data[pos - 1] == SER_ARR);
+    memcpy(&out->data[pos], &n, 4);
+}
 
 /**
  * @brief Handles the "get" command.
@@ -395,8 +425,15 @@ static void do_get(const ptr_vector *cmd, string_c *out) {
     // Look up the key in the hash map
     const HNode *node = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
     if (node) {
-        const string_c *val = container_of(node, Entry, node)->value;
-        out_str(out, val);
+        const Entry *ent = container_of(node, Entry, node);
+        if (ent) {
+            if (ent->type != T_STR) {
+                string_c *tmp = string_new();
+                string_append_cstr(tmp, "expect string type");
+                out_err(out, ERR_TYPE, tmp);
+                string_free(tmp);
+            } else out_str(out, ent->value, string_length(ent->value));
+        }
     } else out_nil(out);
 
     entry_free(&key);
@@ -424,8 +461,25 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
     // Look up the key in the hash map
     const HNode *node = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
     if (node) {
-        // If the key is found, update the value
-        string_swap(container_of(node, Entry, node)->value, ptr_vector_at(cmd, 2));
+        const Entry *ent = container_of(node, Entry, node);
+        if (ent) {
+            if (ent->type != T_STR) {
+                string_c *tmp = string_new();
+                string_append_cstr(tmp, "expect string type");
+                out_err(out, ERR_TYPE, tmp);
+                string_free(tmp);
+                entry_free(&key);
+                return;
+            }
+            string_swap(ent->value, ptr_vector_at(cmd, 2));
+        } else {
+            string_c *tmp = string_new();
+            string_append_cstr(tmp, "memory allocation failed");
+            out_err(out, ERR_UNKNOWN, tmp);
+            string_free(tmp);
+            entry_free(&key);
+            return;
+        }
     } else {
         // If the key is not found, create a new Entry structure and insert it into the hash map
         Entry *new_entry = malloc(sizeof(Entry));
@@ -437,12 +491,31 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
             new_entry->node.hcode = key.node.hcode;
             string_swap(new_entry->value, ptr_vector_at(cmd, 2));
             hm_insert(&g_data.db, &new_entry->node);
+        } else {
+            string_c *tmp = string_new();
+            string_append_cstr(tmp, "memory allocation failed");
+            out_err(out, ERR_UNKNOWN, tmp);
+            string_free(tmp);
+            entry_free(&key);
+            return;
         }
     }
     out_nil(out);
     entry_free(&key);
 }
 
+static void entry_del(Entry *ent) {
+    switch (ent->type) {
+        case T_ZSET:
+            zset_dispose(ent->zset);
+            free(ent->zset);
+            break;
+        default: ;
+    }
+    string_free(ent->key);
+    string_free(ent->value);
+    free(ent);
+}
 
 /**
  * @brief Handles the "del" command.
@@ -464,17 +537,11 @@ static void do_del(const ptr_vector *cmd, string_c *out) {
 
     // Look up the key in the hash map and remove it if found
     const HNode *node = hm_pop(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
-    if (node) {
-        // If the key is found, free the memory allocated for the key and value
-        Entry *entry = container_of(node, Entry, node);
-        string_free(entry->key);
-        string_free(entry->value);
-        free(entry);
-    }
-    // Free the memory allocated for the key in the Entry structure
-    entry_free(&key);
+    if (node) entry_del(container_of(node, Entry, node));
 
     out_int(out, node ? 1 : 0);
+    // Free the memory allocated for the key in the Entry structure
+    entry_free(&key);
 }
 
 /**
@@ -485,7 +552,102 @@ static void do_del(const ptr_vector *cmd, string_c *out) {
  */
 static void cb_scan(const HNode *node, void *arg) {
     string_c *out = arg;
-    out_str(out, container_of(node, Entry, node)->key);
+    const string_c *tmp = container_of(node, Entry, node)->key;
+    out_str(out, tmp, string_length(tmp));
+}
+
+static bool str2dbl(const string_c *str, double *val);
+
+static void do_zadd(const ptr_vector *cmd, string_c *out) {
+    double score = 0;
+    if (!str2dbl(ptr_vector_at(cmd, 2), &score)) {
+        string_c *tmp = string_new();
+        string_append_cstr(tmp, "expected a floating point number");
+        out_err(out, ERR_ARG, tmp);
+        string_free(tmp);
+        return;
+    }
+    // Look up or create the ZSet
+    Entry key;
+    entry_init(&key);
+    assert(string_swap(key.key, ptr_vector_at(cmd, 1)));
+    key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
+    const HNode *hnode = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+
+    Entry *ent;
+    if (hnode == nullptr) {
+        ent = malloc(sizeof(Entry));
+        if (ent) {
+            entry_init(ent);
+            string_swap(ent->key, key.key);
+            ent->node.hcode = key.node.hcode;
+            ent->type = T_ZSET;
+            ent->zset = malloc(sizeof(ZSet));
+            if (ent->zset) {
+                zset_init(ent->zset);
+                hm_insert(&g_data.db, &ent->node);
+            } else {
+                string_c *tmp = string_new();
+                string_append_cstr(tmp, "memory allocation failed");
+                out_err(out, ERR_UNKNOWN, tmp);
+
+                string_free(tmp);
+                entry_free(&key);
+                entry_free(ent);
+                free(ent);
+                return;
+            }
+        } else {
+            string_c *tmp = string_new();
+            string_append_cstr(tmp, "memory allocation failed");
+            out_err(out, ERR_UNKNOWN, tmp);
+
+            string_free(tmp);
+            entry_free(&key);
+            return;
+        }
+    } else {
+        ent = container_of(hnode, Entry, node);
+        if (ent->type != T_ZSET) {
+            string_c *tmp = string_new();
+            string_append_cstr(tmp, "expect zset type");
+            out_err(out, ERR_TYPE, tmp);
+
+            string_free(tmp);
+            entry_free(&key);
+            return;
+        }
+    }
+    const string_c *tmp = ptr_vector_at(cmd, 3);
+    const bool res = zset_add(ent->zset, tmp->data, string_length(tmp), score);
+    out_int(out, res);
+    entry_free(&key);
+}
+
+static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
+    Entry key;
+    entry_init(&key);
+    string_swap(key.key, s);
+    key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
+
+    const HNode *hnode = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    if (hnode == nullptr) {
+        out_nil(out);
+        entry_free(&key);
+        return false;
+    }
+    *ent = container_of(hnode, Entry, node);
+    if ((*ent)->type != T_ZSET) {
+        string_c *tmp = string_new();
+        string_append_cstr(tmp, "expect zset type");
+        out_err(out, ERR_TYPE, tmp);
+
+        string_free(tmp);
+        entry_free(&key);
+        return false;
+    }
+    entry_free(&key);
+    return true;
 }
 
 // Restore the warning about statement expressions in macros
@@ -524,15 +686,98 @@ static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
  * This parameter is not used in this function.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_keys(const ptr_vector *cmd[[maybe_unused]
+static void do_keys(const ptr_vector *cmd [[maybe_unused]], string_c *out) {
+    out_arr(out, hm_size(&g_data.db));
+    h_scan(&g_data.db.ht1, (void (*)(HNode *, void *)) &cb_scan, out);
+    h_scan(&g_data.db.ht2, (void (*)(HNode *, void *)) &cb_scan, out);
+}
 
-],
-string_c *out
-) {
-out_arr(out, hm_size(
-&g_data.db));
-h_scan(&g_data.db.ht1, (void (*)(HNode *, void *)) &cb_scan, out);
-h_scan(&g_data.db.ht2, (void (*)(HNode *, void *)) &cb_scan, out);
+static bool str2dbl(const string_c *str, double *val) {
+    char *end = nullptr;
+    *val = strtod(str->data, &end);
+    return end == str->data + str->size && !isnan(*val);
+}
+
+static bool str2int(const string_c *str, int64_t *val) {
+    char *end = nullptr;
+    *val = strtoll(str->data, &end, 10);
+    return end == str->data + str->size;
+}
+
+static void do_zrem(const ptr_vector *cmd, string_c *out) {
+    Entry *ent = nullptr;
+    if (!expect_zset(out, ptr_vector_at(cmd, 1), &ent)) return;
+
+    const string_c *name = ptr_vector_at(cmd, 2);
+    ZNode *znode = zset_pop(ent->zset, name->data, string_length(name));
+    if (znode) znode_del(znode);
+
+    out_int(out, znode ? 1 : 0);
+}
+
+static void do_zscore(const ptr_vector *cmd, string_c *out) {
+    Entry *ent = nullptr;
+    if (!expect_zset(out, ptr_vector_at(cmd, 1), &ent)) return;
+
+    const string_c *name = ptr_vector_at(cmd, 2);
+    const ZNode *znode = zset_lookup(ent->zset, name->data, string_length(name));
+
+    if (znode) out_dbl(out, znode->score);
+    else out_nil(out);
+}
+
+static void do_zquery(const ptr_vector *cmd, string_c *out) {
+    // Parse args
+    double score = 0;
+    if (!str2dbl(ptr_vector_at(cmd, 2), &score)) {
+        string_c *tmp = string_new();
+        string_append_cstr(tmp, "invalid score");
+        out_err(out, ERR_ARG, tmp);
+        string_free(tmp);
+        return;
+    }
+    const string_c *name = ptr_vector_at(cmd, 3);
+    int64_t offset = 0, limit = 0;
+    if (!str2int(ptr_vector_at(cmd, 4), &offset) || !str2int(ptr_vector_at(cmd, 5), &limit)) {
+        string_c *tmp = string_new();
+        string_append_cstr(tmp, "invalid offset or limit");
+        out_err(out, ERR_ARG, tmp);
+        string_free(tmp);
+        return;
+    }
+    // Get the ZSet
+    Entry *ent = nullptr;
+    if (!expect_zset(out, ptr_vector_at(cmd, 1), &ent)) {
+        if (out->data[0] == SER_NIL) {
+            string_clear(out);
+            out_arr(out, 0);
+        }
+        return;
+    }
+    // Query the ZSet
+    if (limit <= 0) {
+        out_arr(out, 0);
+        return;
+    }
+    ZNode *znode = zset_query(ent->zset, score, name->data, string_length(name));
+    znode = znode_offset(znode, offset);
+
+    // Output
+    void *ctx = begin_arr(out);
+    uint32_t n = 0;
+    string_c *tmp = string_new();
+
+    while (znode && (int64_t) n < limit) {
+        string_clear(tmp);
+        string_append_cstr_range_bin(tmp, znode->name, znode->len);
+
+        out_str(out, tmp, string_length(tmp));
+        out_dbl(out, znode->score);
+        znode = znode_offset(znode, +1);
+        n += 2;
+    }
+    string_free(tmp);
+    end_arr(out, ctx, n);
 }
 
 /**
@@ -563,6 +808,14 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         do_set(cmd, out);
     } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "del")) {
         do_del(cmd, out);
+    } else if (ptr_vector_size(cmd) == 4 && cmd_is(ptr_vector_at(cmd, 0), "zadd")) {
+        do_zadd(cmd, out);
+    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "zrem")) {
+        do_zrem(cmd, out);
+    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "zscore")) {
+        do_zscore(cmd, out);
+    } else if (ptr_vector_size(cmd) == 6 && cmd_is(ptr_vector_at(cmd, 0), "zquery")) {
+        do_zquery(cmd, out);
     } else {
         // cmd is not recognized
         string_c *tmp = string_new();
@@ -570,9 +823,6 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         out_err(out, ERR_UNKNOWN, tmp);
         string_free(tmp);
     }
-    // Free the memory allocated for the command vector and the parsed arguments
-    // for (size_t i = 0; i < ptr_vector_size(cmd); ++i)
-    // string_free(ptr_vector_at(cmd, i));
 }
 
 /**
@@ -801,6 +1051,8 @@ int main() {
     ptr_vector *fd2conn = ptr_vector_new();
 
     vector_c *poll_args = vector_new(sizeof(struct pollfd));
+
+    init_hmap(&g_data.db);
 
     // The event loop
     while (true) {
