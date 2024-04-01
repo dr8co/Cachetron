@@ -54,18 +54,18 @@ size_t hm_size(const HMap *hmap);
 
 void hm_destroy(HMap *hmap);
 
-static void init_hnode(HNode *node) {
+static inline void init_hnode(HNode *node) {
     node->next = NULL;
     node->hcode = 0;
 }
 
-static void init_htab(HTab *htab) {
+static inline void init_htab(HTab *htab) {
     htab->tab = NULL;
     htab->mask = 0;
     htab->size = 0;
 }
 
-static void init_hmap(HMap *hmap) {
+static inline void init_hmap(HMap *hmap) {
     init_htab(&hmap->ht1);
     init_htab(&hmap->ht2);
     hmap->resizing_pos = 0;
