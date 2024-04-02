@@ -9,11 +9,13 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <math.h>
+#include <time.h>
 
 #include "data_structures/string_c.h"
 #include "data_structures/vector_c.h"
 #include "data_structures/hashtable.h"
 #include "data_structures/zset.h"
+#include "data_structures/list.h"
 #include "common.h"
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
@@ -25,6 +27,7 @@ enum : size_t {
     k_max_msg = 4096, ///< The maximum message size
     k_max_args = 1024 ///< The maximum number of arguments
 };
+#define constexpr const
 #endif
 
 /**
@@ -35,7 +38,7 @@ enum : size_t {
 enum {
     STATE_REQ = 0, ///< Waiting for a request from the client.
     STATE_RES = 1, ///< Sending a response to the client.
-    STATE_END = 2  ///< Connection is closed or needs to be deleted.
+    STATE_END = 2 ///< Connection is closed or needs to be deleted.
 };
 
 /**
@@ -44,9 +47,9 @@ enum {
  * This enum is used to represent the result of a command in the server.
  */
 enum {
-    RES_OK = 0,  ///< The command was successful.
+    RES_OK = 0, ///< The command was successful.
     RES_ERR = 1, ///< There was an error executing the command.
-    RES_NX = 2   ///< The command was not executed.
+    RES_NX = 2 ///< The command was not executed.
 };
 
 /**
@@ -55,14 +58,15 @@ enum {
  * This structure is used to manage a connection in the server.
  */
 struct Conn {
-    int fd;                      ///< The file descriptor of the connection.
-    uint32_t state;              ///< The current state of the connection.
+    int fd; ///< The file descriptor of the connection.
+    uint32_t state; ///< The current state of the connection.
+    uint64_t idle_start; ///< The start time of the idle period.
+    size_t rbuf_size; ///< The size of the read buffer.
 
-    size_t rbuf_size;            ///< The size of the read buffer.
+    size_t wbuf_size; ///< The size of the write buffer.
+    size_t wbuf_sent; ///< The amount of data already sent from the write buffer.
+    DList idle_list; ///< The list node for idle connections.
     uint8_t rbuf[4 + k_max_msg]; ///< The read buffer, used to store incoming data.
-
-    size_t wbuf_size;            ///< The size of the write buffer.
-    size_t wbuf_sent;            ///< The amount of data already sent from the write buffer.
     uint8_t wbuf[4 + k_max_msg]; ///< The write buffer, used to store outgoing data.
 };
 
@@ -78,9 +82,11 @@ typedef struct Conn Conn;
 static void conn_init(Conn *conn) {
     conn->fd = -1;
     conn->state = STATE_END;
+    conn->idle_start = 0;
     conn->rbuf_size = 0;
     conn->wbuf_size = 0;
     conn->wbuf_sent = 0;
+    dlist_init(&conn->idle_list);
 
     memset(conn->rbuf, 0, sizeof(conn->rbuf));
     memset(conn->wbuf, 0, sizeof(conn->wbuf));
@@ -93,6 +99,12 @@ static void report_error(const char *msg) {
 static void die(const char *msg) {
     report_error(msg);
     exit(1);
+}
+
+static uint64_t get_monotonic_usec() {
+    struct timespec tv = {0, 0};
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    return (uint64_t) tv.tv_sec * 1'000'000 + tv.tv_nsec / 1000;
 }
 
 /**
@@ -111,6 +123,18 @@ static void fd_set_nb(const int fd) {
 }
 
 /**
+ * @brief Global data structure for the server.
+ *
+ * This structure contains the database (hash map) used by the server to store key-value pairs.\n
+ * The database is represented as an instance of the HMap data structure.
+ */
+static struct {
+    HMap db; ///< The hash map used by the server to store key-value pairs.
+    ptr_vector *fd2conn; ///< A map of active connections, keyed by file descriptor.
+    DList idle_conns; ///< A list of idle connections.
+} g_data;
+
+/**
  * @brief Adds a connection to the connection vector.
  *
  * @param fd2conn Pointer to the vector of connections.
@@ -127,11 +151,10 @@ static void conn_put(ptr_vector *fd2conn, Conn *conn) {
 /**
  * @brief Accepts a new connection and adds it to the connection vector.
  *
- * @param fd2conn Pointer to the vector of connections.
  * @param fd The file descriptor of the server socket.
  * @return 0 if the operation was successful, -1 otherwise.
  */
-static int32_t accept_new_conn(ptr_vector *fd2conn, const int fd) {
+static int32_t accept_new_conn(const int fd) {
     // Accept a new client connection
     struct sockaddr_in client_addr = {};
     socklen_t socklen = sizeof(client_addr);
@@ -151,8 +174,10 @@ static int32_t accept_new_conn(ptr_vector *fd2conn, const int fd) {
         // Set the file descriptor and state of the connection
         conn->fd = connfd;
         conn->state = STATE_REQ;
+        conn->idle_start = get_monotonic_usec();
+        dlist_insert_before(&g_data.idle_conns, &conn->idle_list);
         // Add the connection to the connection vector
-        conn_put(fd2conn, conn);
+        conn_put(g_data.fd2conn, conn);
         return 0;
     }
     // If the connection structure could not be created, close the connection file descriptor
@@ -212,16 +237,6 @@ static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out)
     return 0;
 }
 
-/**
- * @brief Global data structure for the server.
- *
- * This structure contains the database (hash map) used by the server to store key-value pairs.\n
- * The database is represented as an instance of the HMap data structure.
- */
-static struct {
-    HMap db; ///< The hash map used by the server to store key-value pairs.
-} g_data;
-
 enum {
     T_STR = 0,
     T_ZSET = 1,
@@ -234,11 +249,11 @@ enum {
  * Each entry consists of a key-value pair, the type of the value, and a sorted set (ZSet).
  */
 struct Entry {
-    HNode node;      ///< The node used by the hash map. It is used to link the entries in the hash map.
-    string_c *key;   ///< The key of the hash map entry. It identifies the entry in the hash map.
+    HNode node; ///< The node used by the hash map. It is used to link the entries in the hash map.
+    string_c *key; ///< The key of the hash map entry. It identifies the entry in the hash map.
     string_c *value; ///< The value of the hash map entry. It is the data associated with the key.
-    uint32_t type;   ///< The type of the value. It is used to determine how to interpret the value.
-    ZSet *zset;      ///< The sorted set associated with the entry.
+    uint32_t type; ///< The type of the value. It is used to determine how to interpret the value.
+    ZSet *zset; ///< The sorted set associated with the entry.
 };
 
 typedef struct Entry Entry;
@@ -291,9 +306,9 @@ static bool entry_eq(const HNode *lhs, const HNode *rhs) {
  */
 enum {
     ERR_UNKNOWN = 1, ///< Represents an unknown error.
-    ERR_2BIG = 2,    ///< Represents an error when the data is too big.
-    ERR_TYPE = 3,    ///< Represents an error when the data type is invalid.
-    ERR_ARG = 4      ///< Represents an error when the argument is invalid.
+    ERR_2BIG = 2, ///< Represents an error when the data is too big.
+    ERR_TYPE = 3, ///< Represents an error when the data type is invalid.
+    ERR_ARG = 4 ///< Represents an error when the argument is invalid.
 };
 
 static bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr,
@@ -423,7 +438,7 @@ static void do_get(const ptr_vector *cmd, string_c *out) {
     key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
 
     // Look up the key in the hash map
-    const HNode *node = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    const HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
     if (node) {
         const Entry *ent = container_of(node, Entry, node);
         if (ent) {
@@ -459,7 +474,7 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
     key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
 
     // Look up the key in the hash map
-    const HNode *node = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    const HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
     if (node) {
         const Entry *ent = container_of(node, Entry, node);
         if (ent) {
@@ -536,7 +551,7 @@ static void do_del(const ptr_vector *cmd, string_c *out) {
     key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
 
     // Look up the key in the hash map and remove it if found
-    const HNode *node = hm_pop(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    const HNode *node = hm_pop(&g_data.db, &key.node, &entry_eq);
     if (node) entry_del(container_of(node, Entry, node));
 
     out_int(out, node ? 1 : 0);
@@ -572,7 +587,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
     entry_init(&key);
     assert(string_swap(key.key, ptr_vector_at(cmd, 1)));
     key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
-    const HNode *hnode = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    const HNode *hnode = hm_lookup(&g_data.db, &key.node, &entry_eq);
 
     Entry *ent;
     if (hnode == nullptr) {
@@ -630,7 +645,7 @@ static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
     string_swap(key.key, s);
     key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
 
-    const HNode *hnode = hm_lookup(&g_data.db, &key.node, (bool (*)(HNode *, HNode *)) &entry_eq);
+    const HNode *hnode = hm_lookup(&g_data.db, &key.node, &entry_eq);
     if (hnode == nullptr) {
         out_nil(out);
         entry_free(&key);
@@ -648,6 +663,32 @@ static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
     }
     entry_free(&key);
     return true;
+}
+
+constexpr uint64_t k_idle_timeout_ms = 5 * 1000;
+
+static uint32_t next_timer() {
+    if (dlist_empty(&g_data.idle_conns)) return 10'000;
+
+    const uint64_t now = get_monotonic_usec();
+    const Conn *conn = container_of(g_data.idle_conns.next, Conn, idle_list);
+    const uint64_t next = conn->idle_start + k_idle_timeout_ms * 1000;
+
+    if (next > now) return (next - now) / 1000;
+    return 0;
+}
+
+static void conn_done(Conn *conn);
+
+static void process_timers() {
+    const uint64_t now = get_monotonic_usec();
+    while (!dlist_empty(&g_data.idle_conns)) {
+        Conn *conn = container_of(g_data.idle_conns.next, Conn, idle_list);
+        if (conn->idle_start + k_idle_timeout_ms * 1000 > now + 1000) break;
+
+        printf("Removing idle connection: %d\n", conn->fd);
+        conn_done(conn);
+    }
 }
 
 // Restore the warning about statement expressions in macros
@@ -1013,16 +1054,40 @@ static void state_res(Conn *conn) {
  * @param conn Pointer to the connection structure.
  */
 static void connection_io(Conn *conn) {
+    conn->idle_start = get_monotonic_usec();
+    dlist_detach(&conn->idle_list);
+    dlist_insert_before(&g_data.idle_conns, &conn->idle_list);
+
     if (conn->state == STATE_REQ) {
         state_req(conn);
     } else if (conn->state == STATE_RES) {
         state_res(conn);
     } else {
-        assert(0); // not expected
+        die("Invalid state");
     }
 }
 
+static void conn_done(Conn *conn) {
+    // ptr_vector_free(g_data.fd2conn);
+    ptr_vector_set(g_data.fd2conn, conn->fd, nullptr);
+    close(conn->fd);
+    dlist_detach(&conn->idle_list);
+    free(conn);
+}
+
+static __inline void init_g_data() {
+    init_hmap(&g_data.db);
+    g_data.fd2conn = ptr_vector_new();
+    dlist_init(&g_data.idle_conns);
+}
+
+void free_g_data() {
+    hm_destroy(&g_data.db);
+    if (g_data.fd2conn) ptr_vector_free(g_data.fd2conn);
+}
+
 int main() {
+    init_g_data();
     // Create a socket
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) die("socket() failure");
@@ -1047,12 +1112,7 @@ int main() {
     // Set the server socket to non-blocking mode
     fd_set_nb(fd);
 
-    // A map of all client connections, keyed by fd
-    ptr_vector *fd2conn = ptr_vector_new();
-
     vector_c *poll_args = vector_new(sizeof(struct pollfd));
-
-    init_hmap(&g_data.db);
 
     // The event loop
     while (true) {
@@ -1064,8 +1124,8 @@ int main() {
         vector_push_back(poll_args, &pfd);
 
         // Add the client connections to the poll arguments
-        for (size_t i = 0; i < ptr_vector_size(fd2conn); ++i) {
-            const Conn *conn = ptr_vector_at(fd2conn, i);
+        for (size_t i = 0; i < ptr_vector_size(g_data.fd2conn); ++i) {
+            const Conn *conn = ptr_vector_at(g_data.fd2conn, i);
             if (conn == nullptr) continue;
 
             struct pollfd pfd2 = {.fd = -1};
@@ -1076,31 +1136,33 @@ int main() {
             vector_push_back(poll_args, &pfd2);
         }
         // Poll for events
-        rv = poll(vector_data(poll_args), vector_size(poll_args), 1000);
+        const int timeout_ms = next_timer();
+        rv = poll(vector_data(poll_args), vector_size(poll_args), timeout_ms);
         if (rv < 0) die("poll");
 
         // Process the events
         for (size_t i = 1; i < vector_size(poll_args); ++i) {
             if (((struct pollfd *) vector_at(poll_args, i))->revents) {
-                Conn *conn = ptr_vector_at(fd2conn, ((struct pollfd *) vector_at(poll_args, i))->fd);
+                Conn *conn = ptr_vector_at(g_data.fd2conn, ((struct pollfd *) vector_at(poll_args, i))->fd);
                 if (conn == nullptr) continue;
 
                 connection_io(conn);
                 if (conn->state == STATE_END) {
                     // Remove the connection from the connection vector and close the connection
-                    ptr_vector_set(fd2conn, conn->fd, nullptr);
-                    (void) close(conn->fd);
-                    free(conn);
+                    conn_done(conn);
                 }
             }
         }
+        // handle timers
+        process_timers();
+
         // Accept new connections
         if (((struct pollfd *) vector_at(poll_args, 0))->revents)
-            (void) accept_new_conn(fd2conn, fd);
+            accept_new_conn(fd);
     }
     // Free the memory used by the connection vector and the poll arguments
     vector_free(poll_args);
-    ptr_vector_free(fd2conn);
+    // free_g_data();
 
     return 0;
 }

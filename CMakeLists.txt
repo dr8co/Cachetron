@@ -23,6 +23,9 @@ endif ()
 # Additional checks for the Debug build
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wpedantic")
 
+# Sanitizers (Disabled by default, slows down the program. Uncomment to enable)
+#set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -fsanitize=address,leak,undefined -fno-omit-frame-pointer")
+
 # Tests
 add_subdirectory(tests)
 
@@ -38,7 +41,9 @@ add_executable(server
         data_structures/hashtable.c
         data_structures/hashtable.h
         data_structures/zset.c
-        data_structures/zset.h)
+        data_structures/zset.h
+        data_structures/list.c
+        data_structures/list.h)
 
 add_executable(client
         client.c
