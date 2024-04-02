@@ -44,11 +44,11 @@ struct HMap {
 
 typedef struct HMap HMap;
 
-HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *));
+HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(const HNode *, const HNode *));
 
 void hm_insert(HMap *hmap, HNode *node);
 
-HNode *hm_pop(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *));
+HNode *hm_pop(HMap *hmap, HNode *key, bool (*eq)(const HNode *, const HNode *));
 
 size_t hm_size(const HMap *hmap);
 

@@ -82,7 +82,7 @@ static void h_insert(HTab *htab, HNode *node) {
  * @param eq A function pointer to a binary predicate that compares two nodes for equality.
  * @return A pointer to the pointer to the found node in the hashtable, or nullptr if no such node is found.
  */
-static HNode **h_lookup(const HTab *htab, HNode *key, bool (*eq)(HNode *, HNode *)) {
+static HNode **h_lookup(const HTab *htab, HNode *key, bool (*eq)(const HNode *, const HNode *)) {
     if (htab->tab) {
         const size_t pos = key->hcode & htab->mask;
         HNode **from = &htab->tab[pos]; // incoming pointer to the result
@@ -163,7 +163,7 @@ static void hm_start_resizing(HMap *hmap) {
  * @param eq A function pointer to a binary predicate that compares two nodes for equality.
  * @return A pointer to the found node in the hashmap, or nullptr if no such node is found.
  */
-HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
+HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(const HNode *, const HNode *)) {
     hm_help_resizing(hmap);
     // Look up in the first hashtable
     HNode **from = h_lookup(&hmap->ht1, key, eq);
@@ -204,7 +204,7 @@ void hm_insert(HMap *hmap, HNode *node) {
  * @param eq A function pointer to a binary predicate that compares two nodes for equality.
  * @return The removed node if found, or nullptr if no such node is found.
  */
-HNode *hm_pop(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
+HNode *hm_pop(HMap *hmap, HNode *key, bool (*eq)(const HNode *, const HNode *)) {
     hm_help_resizing(hmap);
     HNode **from = h_lookup(&hmap->ht1, key, eq);
     if (from)

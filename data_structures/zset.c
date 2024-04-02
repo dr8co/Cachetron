@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -122,7 +121,7 @@ ZNode *zset_lookup(ZSet *zset, const char *name, const size_t len) {
         key.node.hcode = fnv1a_hash((uint8_t *) name, len);
         key.name = name;
         key.len = len;
-        const HNode *found = hm_lookup(&zset->hmap, &key.node, (bool(*)(HNode *, HNode *)) &hcmp);
+        const HNode *found = hm_lookup(&zset->hmap, &key.node, &hcmp);
         if (found) return container_of(found, ZNode, hmap);
     }
     return nullptr;
@@ -144,7 +143,7 @@ ZNode *zset_pop(ZSet *zset, const char *name, const size_t len) {
         key.name = name;
         key.len = len;
 
-        const HNode *found = hm_pop(&zset->hmap, &key.node, (bool(*)(HNode *, HNode *)) &hcmp);
+        const HNode *found = hm_pop(&zset->hmap, &key.node, &hcmp);
         if (found) {
             ZNode *node = container_of(found, ZNode, hmap);
             zset->tree = avl_del(&node->tree);
