@@ -143,6 +143,28 @@ void *vector_at(const vector_c *const restrict v, const size_t index) {
 }
 
 /**
+ * @brief Retrieves the last element of the vector.
+ *
+ * @param v A pointer to the vector.
+ * @return A pointer to the last element in the vector, or nullptr if the vector is empty or is nullptr.
+ */
+void *vector_back(const vector_c *restrict v) {
+    if (v && v->size) return (char *) v->data + (v->size - 1) * v->element_size;
+    return nullptr;
+}
+
+/**
+ * @brief Retrieves the first element of the vector.
+ *
+ * @param v A pointer to the vector.
+ * @return A pointer to the first element in the vector, or nullptr if the vector is empty or is nullptr.
+ */
+void *vector_front(const vector_c *restrict v) {
+    if (v && v->size) return v->data;
+    return nullptr;
+}
+
+/**
  * @brief Removes the last element from the vector.
  *
  * @param v A pointer to the vector from which the last element will be removed.
@@ -532,4 +554,26 @@ size_t ptr_vector_capacity(const ptr_vector *const restrict v) {
  */
 void ptr_vector_clear(ptr_vector *const restrict v) {
     if (v) v->size = 0;
+}
+
+/**
+ * @brief Retrieves the last element of the pointer vector.
+ *
+ * @param v A pointer to the pointer vector.
+ * @return A pointer to the last element in the pointer vector, or nullptr if the vector is empty or is nullptr.
+ */
+void *ptr_vector_back(const ptr_vector *restrict v) {
+    if (v && v->size) return v->data[v->size - 1];
+    return nullptr;
+}
+
+/**
+ * @brief Retrieves the first element of the pointer vector.
+ *
+ * @param v A pointer to the pointer vector.
+ * @return A pointer to the first element in the pointer vector, or nullptr if the vector is empty or is nullptr.
+ */
+void *ptr_vector_front(const ptr_vector *restrict v) {
+    if (v && v->size) return v->data[0];
+    return nullptr;
 }

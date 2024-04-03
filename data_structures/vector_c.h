@@ -47,6 +47,11 @@ size_t vector_capacity(const vector_c *restrict v);
 
 void vector_clear(vector_c *restrict v);
 
+void *vector_back(const vector_c *restrict v);
+
+void *vector_front(const vector_c *restrict v);
+
+
 /*/////////////////////// ptr_vector ///////////////////////*/
 
 /**
@@ -85,6 +90,10 @@ size_t ptr_vector_size(const ptr_vector *restrict v);
 size_t ptr_vector_capacity(const ptr_vector *restrict v);
 
 void ptr_vector_clear(ptr_vector *restrict v);
+
+void *ptr_vector_back(const ptr_vector *restrict v);
+
+void *ptr_vector_front(const ptr_vector *restrict v);
 
 #if __cplusplus
     }
