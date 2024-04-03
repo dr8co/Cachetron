@@ -2,7 +2,9 @@
 
 import shlex
 import subprocess
+import sys
 from typing import List, Tuple
+from termcolor import colored
 
 CASES = r'''
 $ ./client zscore asdf n1
@@ -95,7 +97,9 @@ def run_commands(cmds_: List[str], outputs_: List[str]) -> None:
             out = subprocess.check_output(shlex.split(cmd), timeout=5, stderr=subprocess.STDOUT).decode('utf-8')
 
         except subprocess.TimeoutExpired:
-            print(f"Command '{cmd}' did not complete within the specified timeout.")
+            print(colored(f"Command '", 'red'), end='')
+            print(colored(cmd, 'blue', attrs=['bold', 'underline']), end='')
+            print(colored("' did not complete within the specified timeout.", 'red'))
             continue
 
         # Handle non-zero exit status
@@ -103,35 +107,44 @@ def run_commands(cmds_: List[str], outputs_: List[str]) -> None:
             out = e.output.decode('utf-8').strip()
             if "Connection refused" in out:
                 raise ConnectionError('Connection refused. Is the server running?')
+            if "Connection reset by peer" in out:
+                raise ConnectionError('Connection reset by peer. The server may have exited unexpectedly.')
             raise e
 
         if out != expected:
-            print(f'cmd: {cmd}\noutput:\n{out}\nexpected:\n{expected}\n{"-" * 40}')
+            print(colored(f"command '", 'cyan'), colored(cmd, 'yellow', attrs=['bold']), end='')
+            print(colored("' failed.", 'cyan'))
+            print(colored("Output:", 'blue', attrs=['bold']))
+            print(colored(out, 'red'))
+            print(colored("Expected:", 'blue', attrs=['bold']))
+            print(colored(expected, 'green'))
+            print(colored("-" * 40, 'magenta'))
 
 
 try:
     client = find_client()
-    print(f'Using client: {client}')
+    print(colored('Using client:', 'green'), colored(client, 'yellow', attrs=['bold']))
 except FileNotFoundError:
-    print('Client executable not found.')
+    print(colored('Client executable not found.', 'red'), file=sys.stderr)
     exit(1)
 
 cmds, outputs = parse_cases(CASES)
 if len(cmds) != len(outputs):
-    print('Number of commands and outputs do not match.')
+    print(colored('Number of commands and outputs do not match.', 'red'), file=sys.stderr)
     exit(1)
 
 try:
     run_commands(cmds, outputs)
 except ConnectionError as err:
-    print(err)
+    print(colored(err, 'red'), file=sys.stderr)
     exit(1)
 except subprocess.CalledProcessError as err:
     error = err.output.decode('utf-8').strip()
     if error:
-        print(error)
+        print(colored(error, 'red'), file=sys.stderr)
     else:
-        print(f'Command failed with exit status {err.returncode}.')
+        print(colored('Command failed with exit status.'), colored(err.returncode, 'blue', attrs=['bold']),
+              file=sys.stderr)
     exit(1)
 
-print('All tests passed.')
+print(colored('All tests passed.', 'green'))
