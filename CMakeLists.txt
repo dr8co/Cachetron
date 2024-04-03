@@ -4,13 +4,13 @@ project(Cachetron C CXX)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# This program only targets Linux
+# Check if the system is Linux
 if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     message(FATAL_ERROR "This program only targets Linux.")
 endif ()
 
-# GCC and Clang are the only supported compilers
-# Due to use of GNU statement expression extension from macro expansion ('container_of' macro)
+# GCC and Clang are (probably) the only supported compilers due to use of
+# GNU statement expression extension from macro expansion ('container_of' macro)
 if (NOT ${CMAKE_C_COMPILER_ID} STREQUAL "GNU" AND NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
     message(FATAL_ERROR "Only GCC and Clang are supported.")
 endif ()
@@ -23,7 +23,7 @@ endif ()
 # Additional checks for the Debug build
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wpedantic")
 
-# Sanitizers (Disabled by default, slows down the program. Uncomment to enable)
+# Sanitizers for debug (Disabled by default, slows down the program. Uncomment to enable)
 #set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -fsanitize=address,leak,undefined -fno-omit-frame-pointer")
 
 # Tests
@@ -43,7 +43,9 @@ add_executable(server
         data_structures/zset.c
         data_structures/zset.h
         data_structures/list.c
-        data_structures/list.h)
+        data_structures/list.h
+        data_structures/heap.c
+        data_structures/heap.h)
 
 add_executable(client
         client.c
