@@ -63,7 +63,6 @@ bool thread_pool_push(ThreadPool *pool, void (*function)(void *), void *arg) {
 
 void thread_pool_queue(ThreadPool *pool, void (*function)(void *), void *arg) {
     Worker task = {function, arg};
-
     pthread_mutex_lock(&pool->mutex);
     deque_push_back(pool->queue, &task);
     pthread_mutex_unlock(&pool->mutex);
