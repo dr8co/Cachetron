@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <stddef.h>
-#include "../data_structures/vector_c.h"
+#include "../data_structures/vector/vector_c.h"
 
 #if !(__GNUC__ >= 13 || __clang_major__ >= 19)
 #define constexpr const

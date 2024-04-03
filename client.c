@@ -7,8 +7,8 @@
 #include <assert.h>
 #include <errno.h>
 
-#include "data_structures/string_c.h"
-#include "data_structures/vector_c.h"
+#include "data_structures/string/string_c.h"
+#include "data_structures/vector/vector_c.h"
 #include "common.h"
 
 // C23 constexpr support

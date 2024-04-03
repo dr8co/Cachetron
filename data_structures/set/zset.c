@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "zset.h"
-#include "../common.h"
+#include "../../common.h"
 
 /**
  * @brief Creates a new ZNode.

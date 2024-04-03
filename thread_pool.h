@@ -1,8 +1,8 @@
 #pragma once
 
 #include <pthread.h>
-#include "data_structures/deque_c.h"
-#include "data_structures/vector_c.h"
+#include "data_structures/queue/deque_c.h"
+#include "data_structures/vector/vector_c.h"
 
 struct Worker {
     void (*function)(void *); ///< The function to execute.

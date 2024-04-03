@@ -1,6 +1,6 @@
 #pragma once
-#include "avl.h"
-#include "hashtable.h"
+#include "../trees/avl.h"
+#include "../hashmap/hashtable.h"
 
 #if __cplusplus
 extern "C" {

@@ -11,12 +11,12 @@
 #include <math.h>
 #include <time.h>
 
-#include "data_structures/string_c.h"
-#include "data_structures/vector_c.h"
-#include "data_structures/hashtable.h"
-#include "data_structures/zset.h"
-#include "data_structures/list.h"
-#include "data_structures/heap.h"
+#include "data_structures/string/string_c.h"
+#include "data_structures/vector/vector_c.h"
+#include "data_structures/hashmap/hashtable.h"
+#include "data_structures/set/zset.h"
+#include "data_structures/list/list.h"
+#include "data_structures/trees/heap.h"
 #include "thread_pool.h"
 #include "common.h"
 

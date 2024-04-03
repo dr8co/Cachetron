@@ -1,4 +1,4 @@
-#include "../data_structures/deque_c.h"
+#include "../data_structures/queue/deque_c.h"
 #include <assert.h>
 
 void create_deque_should_initialize_empty_deque() {

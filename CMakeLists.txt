@@ -43,29 +43,29 @@ add_subdirectory(tests)
 add_executable(server
         server.c
         common.h
-        data_structures/avl.c
-        data_structures/avl.h
-        data_structures/vector_c.c
-        data_structures/vector_c.h
-        data_structures/string_c.c
-        data_structures/string_c.h
-        data_structures/hashtable.c
-        data_structures/hashtable.h
-        data_structures/zset.c
-        data_structures/zset.h
-        data_structures/list.c
-        data_structures/list.h
-        data_structures/heap.c
-        data_structures/heap.h
-        data_structures/deque_c.c
-        data_structures/deque_c.h
         thread_pool.c
-        thread_pool.h)
+        thread_pool.h
+        data_structures/trees/avl.c
+        data_structures/trees/avl.h
+        data_structures/vector/vector_c.c
+        data_structures/vector/vector_c.h
+        data_structures/string/string_c.c
+        data_structures/string/string_c.h
+        data_structures/hashmap/hashtable.c
+        data_structures/hashmap/hashtable.h
+        data_structures/set/zset.c
+        data_structures/set/zset.h
+        data_structures/list/list.c
+        data_structures/list/list.h
+        data_structures/trees/heap.c
+        data_structures/trees/heap.h
+        data_structures/queue/deque_c.c
+        data_structures/queue/deque_c.h)
 
 add_executable(client
         client.c
-        data_structures/vector_c.c
-        data_structures/vector_c.h
-        data_structures/string_c.c
-        data_structures/string_c.h
+        data_structures/vector/vector_c.c
+        data_structures/vector/vector_c.h
+        data_structures/string/string_c.c
+        data_structures/string/string_c.h
         common.h)
