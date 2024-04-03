@@ -44,7 +44,7 @@ void string_free(string_c *const restrict s) {
 }
 
 // Round up x to the next power of 2
-static size_t clp2(unsigned x) {
+__attribute_pure__ static size_t clp2(unsigned x) {
     --x;
     x |= x >> 1;
     x |= x >> 2;
@@ -68,7 +68,7 @@ static size_t clp2(unsigned x) {
  * The new size is rounded up to the next power of 2 to improve performance.
  * @warning This function is for internal use only, and should not be called directly by the user.
  */
-static bool string_resize(string_c *const restrict s, size_t size) {
+bool string_reserve(string_c *const restrict s, size_t size) {
     if (s) {
         if (size <= 16) return true;
 
@@ -111,7 +111,7 @@ bool string_insert_cstr_range(string_c *const restrict s, const char *const rest
             if (index < s->size) {
                 // Resize the string if necessary
                 if (s->size + count >= s->capacity) {
-                    if (!string_resize(s, s->size + count)) return false;
+                    if (!string_reserve(s, s->size + count)) return false;
                 }
                 // Move the characters after the index to make room for the C-string
                 memmove(s->data + (index + count) * sizeof(char), s->data + index * sizeof(char),
@@ -155,7 +155,7 @@ bool string_insert_cstr(string_c *const restrict s, const char *restrict cstr, c
 bool string_push_back(string_c *const restrict s, const char c) {
     if (s && c != '\0') {
         if (s->size == s->capacity) {
-            if (!string_resize(s, s->capacity * 2)) return false;
+            if (!string_reserve(s, s->capacity * 2)) return false;
         }
         s->data[s->size++] = c;
         return true;
@@ -310,7 +310,7 @@ bool string_insert(string_c *const restrict s, const size_t index, const char c)
         if (index < s->size) {
             // Resize the string if necessary
             if (s->size == s->capacity) {
-                if (!string_resize(s, s->capacity * 2)) return false;
+                if (!string_reserve(s, s->capacity * 2)) return false;
             }
             // Move the characters after the index to make room for the new character
             memmove(s->data + (index + 1) * sizeof(char), s->data + index * sizeof(char),
@@ -346,7 +346,7 @@ bool string_insert_range(string_c *const restrict s, const string_c *const restr
         if (count <= sub->size) {
             if (index < s->size) {
                 if (s->size + count >= s->capacity) {
-                    if (!string_resize(s, s->size + count)) return false;
+                    if (!string_reserve(s, s->size + count)) return false;
                 }
                 memmove(s->data + (index + count) * sizeof(char), s->data + index * sizeof(char),
                         (s->size - index) * sizeof(char));
@@ -397,7 +397,7 @@ string_c *string_substr(const string_c *const restrict s, const size_t start, co
         string_c *sub = string_new();
         if (sub) {
             // Resize the new string to the length of the substring
-            if (string_resize(sub, len)) {
+            if (string_reserve(sub, len)) {
                 // Copy the substring into the new string
                 memcpy(sub->data, s->data + start, len);
                 sub->size = len;
@@ -424,7 +424,7 @@ string_c *string_concat(const string_c *const restrict s1, const string_c *const
         string_c *s = string_new();
         if (s) {
             // Resize the new string appropriately
-            if (string_resize(s, s1->size + s2->size)) {
+            if (string_reserve(s, s1->size + s2->size)) {
                 // Copy the input strings into the new string
                 memcpy(s->data, s1->data, s1->size * sizeof(char));
                 memcpy(s->data + s1->size * sizeof(char), s2->data, s2->size * sizeof(char));
@@ -454,7 +454,7 @@ bool string_append_range(string_c *const restrict s1, const string_c *const rest
 
         if (s2) {
             if (count <= s2->size) {
-                if (string_resize(s1, s1->size + count)) {
+                if (string_reserve(s1, s1->size + count)) {
                     // Copy the characters from the second string into the first string
                     memcpy(s1->data + s1->size * sizeof(char), s2->data, count * sizeof(char));
 
@@ -492,7 +492,7 @@ bool string_append_cstr_range(string_c *const restrict s, const char *const rest
         if (cstr) {
             // Resize the string if necessary
             if (count <= strlen(cstr)) {
-                if (string_resize(s, s->size + count)) {
+                if (string_reserve(s, s->size + count)) {
                     // Copy the C-string into the string
                     memcpy(s->data + s->size * sizeof(char), cstr, count * sizeof(char));
                     s->size += count;
@@ -598,7 +598,7 @@ bool string_copy(const string_c *const restrict src, string_c *const restrict de
     if (src && dest && src->data && dest->data) {
         // Resize the destination string if necessary
         if (src->size > dest->size)
-            if (!string_resize(dest, src->size)) return false;
+            if (!string_reserve(dest, src->size)) return false;
 
         // Copy the characters from the source string to the destination string
         memcpy(dest->data, src->data, src->size * sizeof(char));
