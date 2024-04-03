@@ -3,10 +3,16 @@
 
 static void *worker(void *arg) {
     ThreadPool *pool = arg;
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, nullptr);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, nullptr);
     while (true) {
         pthread_mutex_lock(&pool->mutex);
-        while (deque_empty(pool->queue)) {
+        while (deque_empty(pool->queue) && !pool->stop) {
             pthread_cond_wait(&pool->condition, &pool->mutex);
+        }
+        if (pool->stop) {
+            pthread_mutex_unlock(&pool->mutex);
+            pthread_exit(nullptr);
         }
         const Worker task = *(Worker *) deque_front(pool->queue);
         deque_pop_front(pool->queue);
@@ -31,6 +37,10 @@ bool thread_pool_init(ThreadPool *pool, const size_t num_threads) {
                     }
                     ptr_vector_push_back(pool->threads, thread);
                 }
+                pthread_mutex_lock(&pool->mutex);
+                pool->stop = false;
+                pthread_mutex_unlock(&pool->mutex);
+
                 return true;
             }
         }
@@ -39,9 +49,15 @@ bool thread_pool_init(ThreadPool *pool, const size_t num_threads) {
 }
 
 void thread_pool_destroy(ThreadPool *pool) {
+    pthread_mutex_lock(&pool->mutex);
+    pool->stop = true;
+    pthread_cond_broadcast(&pool->condition); // Wake up all threads to stop
+    pthread_mutex_unlock(&pool->mutex);
+
+    // Join all threads
     for (size_t i = 0; i < ptr_vector_size(pool->threads); ++i) {
         pthread_t *thread = ptr_vector_at(pool->threads, i);
-        pthread_cancel(*thread);
+        pthread_join(*thread, nullptr);
         free(thread);
     }
     ptr_vector_free(pool->threads);

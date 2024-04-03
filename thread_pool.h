@@ -16,6 +16,7 @@ struct ThreadPool {
     Deque *queue; ///< A deque to hold tasks.
     pthread_mutex_t mutex; ///< A mutex to protect the queue.
     pthread_cond_t condition; ///< A condition variable to signal the threads.
+    bool stop; ///< A flag to signal the threads to stop.
 };
 
 typedef struct ThreadPool ThreadPool;
