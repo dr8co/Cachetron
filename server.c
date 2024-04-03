@@ -17,6 +17,7 @@
 #include "data_structures/zset.h"
 #include "data_structures/list.h"
 #include "data_structures/heap.h"
+#include "thread_pool.h"
 #include "common.h"
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
@@ -135,6 +136,7 @@ static struct {
     ptr_vector *fd2conn; ///< A map of active connections, keyed by file descriptor.
     DList idle_conns; ///< A list of idle connections.
     vector_c *heap; ///< A heap to manage the connections.
+    ThreadPool pool; ///< A thread pool to handle tasks.
 } g_data;
 
 /**
@@ -526,7 +528,8 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
 
 static void entry_set_ttl(Entry *ent, int64_t ttl_ms);
 
-static void entry_del(Entry *ent) {
+// Deallocate the key immediately
+static void entry_destroy(Entry *ent) {
     switch (ent->type) {
         case T_ZSET:
             zset_dispose(ent->zset);
@@ -536,8 +539,28 @@ static void entry_del(Entry *ent) {
     }
     string_free(ent->key);
     string_free(ent->value);
-    entry_set_ttl(ent, SIZE_MAX);
     free(ent);
+}
+
+static void entry_del_async(void *arg) {
+    entry_destroy(arg);
+}
+
+// Dispose the entry after it got detached from the key space
+static void entry_del(Entry *ent) {
+    entry_set_ttl(ent, SIZE_MAX);
+    constexpr size_t k_large_container_size = 10'000;
+    bool too_big = false;
+
+    switch (ent->type) {
+        case T_ZSET:
+            too_big = hm_size(&ent->zset->hmap) > k_large_container_size;
+            break;
+        default: ;
+    }
+    if (too_big)
+        thread_pool_queue(&g_data.pool, &entry_del_async, ent);
+    else entry_destroy(ent);
 }
 
 /**
@@ -1193,17 +1216,22 @@ static __inline void init_g_data() {
     g_data.fd2conn = ptr_vector_new();
     dlist_init(&g_data.idle_conns);
     g_data.heap = vector_new(sizeof(HeapItem));
+    thread_pool_init(&g_data.pool, 4);
 }
 
 void free_g_data() {
-    hm_destroy(&g_data.db);
     ptr_vector_free(g_data.fd2conn);
     vector_free(g_data.heap);
+    thread_pool_destroy(&g_data.pool);
+
+    // Free all nodes in the hash map
+    // h_scan(&g_data.db.ht1, (void (*)(HNode *, void *)) &entry_del, nullptr);
+    // h_scan(&g_data.db.ht2, (void (*)(HNode *, void *)) &entry_del, nullptr);
+    // hm_destroy(&g_data.db);
 }
 
 int main() {
-    init_g_data();
-    // Create a socket
+    // Create a listening socket
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) die("socket() failure");
 
@@ -1227,6 +1255,7 @@ int main() {
     // Set the server socket to non-blocking mode
     fd_set_nb(fd);
 
+    init_g_data();
     vector_c *poll_args = vector_new(sizeof(struct pollfd));
 
     // The event loop
@@ -1277,7 +1306,7 @@ int main() {
     }
     // Free the memory used by the connection vector and the poll arguments
     vector_free(poll_args);
-    // free_g_data();
+    free_g_data();
 
     return 0;
 }

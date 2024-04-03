@@ -45,7 +45,11 @@ add_executable(server
         data_structures/list.c
         data_structures/list.h
         data_structures/heap.c
-        data_structures/heap.h)
+        data_structures/heap.h
+        data_structures/deque_c.c
+        data_structures/deque_c.h
+        thread_pool.c
+        thread_pool.h)
 
 add_executable(client
         client.c
