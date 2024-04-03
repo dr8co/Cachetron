@@ -20,11 +20,22 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif ()
 
-# Additional checks for the Debug build
+# Additional options for the Debug build
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wpedantic")
 
-# Sanitizers for debug (Disabled by default, slows down the program. Uncomment to enable)
-#set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -fsanitize=address,leak,undefined -fno-omit-frame-pointer")
+# Sanitizers for debugging (Disabled by default, slows down the program. Uncomment to enable)
+# GCC does not support all sanitizers, so Clang is recommended for this purpose. Requires llvm-symbolizer
+# The build type should be RelWithDebInfo (or Debug) for sanitizers to work properly
+if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
+    # Address, leak, undefined, integer, nullability sanitizers
+    set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=address,leak,undefined,integer,nullability -fno-omit-frame-pointer -g")
+
+    # Thread sanitizer, cannot be used with address sanitizer
+    #  set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=thread -fPIE -fno-omit-frame-pointer -g -O1")
+
+    # Memory sanitizer, cannot be used with address sanitizer.
+    # set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=memory -fPIE -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O1")
+endif ()
 
 # Tests
 add_subdirectory(tests)
