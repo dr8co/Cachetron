@@ -8,6 +8,35 @@ from typing import List, Tuple
 from termcolor import colored
 
 CASES = r'''
+$ ./client asdf
+(err) 1 Unknown cmd
+$ ./client get asdf
+(nil)
+$ ./client set k v
+(nil)
+$ ./client get k
+(str) v
+$ ./client keys
+(arr) len=1
+(str) k
+(arr) end
+$ ./client set k2 v2
+(nil)
+$ ./client exists k
+(int) 1
+$ ./client exists k k2 asdf k k2
+(int) 23
+$ ./client del k
+(int) 1
+$ ./client del k2
+(int) 1
+$ ./client del k
+(int) 0
+$ ./client keys
+(arr) len=0
+(arr) end
+$ ./client exists k
+(int) 0
 $ ./client zscore asdf n1
 (nil)
 $ ./client zquery xxx 1 asdf 1 10
@@ -104,19 +133,23 @@ def parse_cases(cases: str) -> Tuple[List[str], List[str]]:
     return cmds_, outputs_
 
 
-def run_commands(cmds_: List[str], outputs_: List[str]) -> None:
+def run_commands(cmds_: List[str], outputs_: List[str]) -> bool:
     """
     Run the commands and compare the output with the expected output.
     :param cmds_: List of str commands to run.
     :param outputs_: List of str expected outputs.
+    :return: True if all tests pass, False otherwise.
     """
+    success = True
     for cmd, expected in zip(cmds_, outputs_):
         try:
             out = subprocess.check_output(shlex.split(cmd), timeout=5, stderr=subprocess.STDOUT).decode('utf-8')
 
         except subprocess.TimeoutExpired:
+            cmd_no_name = ' '.join(cmd.split()[1:])
+
             print(colored(f"Command '", 'red'), end='')
-            print(colored(cmd, 'blue', attrs=['bold', 'underline']), end='')
+            print(colored(cmd_no_name, 'blue', attrs=['bold', 'underline']), end='')
             print(colored("' did not complete within the specified timeout.", 'red'))
             continue
 
@@ -130,13 +163,18 @@ def run_commands(cmds_: List[str], outputs_: List[str]) -> None:
             raise e
 
         if out != expected:
-            print(colored(f"command '", 'cyan'), colored(cmd, 'yellow', attrs=['bold']), end='')
-            print(colored("' failed.", 'cyan'))
+            cmd_no_name = ' '.join(cmd.split()[1:])
+
+            print(colored(f"command '", 'cyan'), colored(cmd_no_name, 'yellow', attrs=['bold']), sep='', end='')
+            print(colored("' failed.", 'cyan'), '\n')
             print(colored("Output:", 'blue', attrs=['bold']))
             print(colored(out, 'red'))
+
             print(colored("Expected:", 'blue', attrs=['bold']))
-            print(colored(expected, 'green'))
-            print(colored("-" * 40, 'magenta'))
+            print(colored(expected, 'green'), '\n', colored("-" * 60, 'magenta'), sep='')
+            success = False
+
+    return success
 
 
 if __name__ == '__main__':
@@ -146,7 +184,7 @@ if __name__ == '__main__':
 
     try:
         client = find_client(args.client)
-        print(colored('Using client:', 'green'), colored(client, 'yellow', attrs=['bold']))
+        print(colored('Using client:', 'green'), colored(client, 'yellow', attrs=['bold']), '\n')
     except FileNotFoundError as err:
         print(colored(err, 'red', attrs=['bold']), file=sys.stderr)
         print(colored('Please provide the path to the client executable using the --client flag.', 'cyan'))
@@ -170,7 +208,7 @@ if __name__ == '__main__':
         exit(1)
 
     try:
-        run_commands(cmds, outputs)
+        all_tests_passed = run_commands(cmds, outputs)
     except ConnectionError as err:
         print(colored(err, 'red'), file=sys.stderr)
         exit(1)
@@ -183,4 +221,8 @@ if __name__ == '__main__':
                   colored(err.returncode, 'blue', attrs=['bold']), file=sys.stderr)
         exit(1)
 
-    print(colored('All tests passed.', 'green'))
+    if all_tests_passed:
+        print(colored('All tests passed.', 'green'))
+    else:
+        print(colored('Some tests failed.', 'red'), file=sys.stderr)
+        exit(1)
