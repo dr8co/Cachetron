@@ -953,6 +953,18 @@ static void do_zquery(const ptr_vector *cmd, string_c *out) {
     end_arr(out, ctx, n);
 }
 
+static void do_exists(const ptr_vector *cmd, string_c *out) {
+    Entry key;
+    entry_init(&key);
+    string_swap(key.key, ptr_vector_at(cmd, 1));
+    key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
+
+    const HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
+    out_int(out, node ? 1 : 0);
+    entry_free(&key);
+}
+
+
 /**
  * @brief Compares a string with a command string, ignoring case.
  *
@@ -964,6 +976,7 @@ static bool cmd_is(const string_c *word, const char *cmd) {
     return string_case_compare_cstr(word, cmd);
 }
 
+static bool g_running = true;
 
 /**
  * @brief Processes a client request and generates a response.
@@ -985,6 +998,8 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         do_expire(cmd, out);
     } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "pttl")) {
         do_ttl(cmd, out);
+    } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "exists")) {
+        do_exists(cmd, out);
     } else if (ptr_vector_size(cmd) == 4 && cmd_is(ptr_vector_at(cmd, 0), "zadd")) {
         do_zadd(cmd, out);
     } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "zrem")) {
@@ -993,6 +1008,12 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         do_zscore(cmd, out);
     } else if (ptr_vector_size(cmd) == 6 && cmd_is(ptr_vector_at(cmd, 0), "zquery")) {
         do_zquery(cmd, out);
+    }else if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "shutdown")) {
+        g_running = false;
+        string_c *tmp = string_new();
+        string_append_cstr(tmp, "Server is shutting down...");
+        out_str(out, tmp, string_length(tmp));
+        string_free(tmp);
     } else {
         // cmd is not recognized
         string_c *tmp = string_new();
@@ -1259,7 +1280,7 @@ int main() {
     vector_c *poll_args = vector_new(sizeof(struct pollfd));
 
     // The event loop
-    while (true) {
+    while (g_running) {
         // Clear the poll arguments
         vector_clear(poll_args);
 
