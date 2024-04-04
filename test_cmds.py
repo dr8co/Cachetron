@@ -3,6 +3,7 @@
 import shlex
 import subprocess
 import sys
+import argparse
 from typing import List, Tuple
 from termcolor import colored
 
@@ -44,27 +45,44 @@ $ ./client zquery zset 1 "" 0 10
 (str) n2
 (dbl) 2
 (arr) end
+$ ./client shutdown
+(str) Server is shutting down...
 '''
 
 
-def find_client() -> str:
+def find_client(client_path: str = None) -> str:
     """
     Finds the client executable.
-    :return: Path to the client executable.
+    :param client_path: Optional path to the client executable.
+    :return: Absolute path to the client executable.
     """
     import os
 
-    # First, check the current working directory
+    # Check if the provided path, if any, is valid
+    if client_path is not None:
+        if os.path.isfile(client_path):
+            if os.access(client_path, os.X_OK):
+                return os.path.abspath(client_path)
+            else:
+                raise PermissionError(f'Provided client path {client_path} is not executable.')
+        else:
+            raise FileNotFoundError(f'Provided client path {client_path} is not a valid executable.')
+
+    # Check the current working directory
     candidate = os.path.join(os.getcwd(), 'client')
-    if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-        return candidate
+    if os.path.isfile(candidate):
+        if os.access(candidate, os.X_OK):
+            return os.path.abspath(candidate)
+        else:
+            raise PermissionError('Client found in the current working directory is not executable.')
 
     # If not found, check the PATH
     for path in os.environ['PATH'].split(os.pathsep):
         path = path.strip('"')
         candidate = os.path.join(path, 'client')
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            raise FileNotFoundError(f'Client not found in the current working directory.\nDid you mean {candidate}?')
+            raise FileNotFoundError('Client not found in the current working directory.'
+                                    f'\nDid you mean {os.path.abspath(candidate)}?')
 
     raise FileNotFoundError('Client executable not found.')
 
@@ -121,30 +139,48 @@ def run_commands(cmds_: List[str], outputs_: List[str]) -> None:
             print(colored("-" * 40, 'magenta'))
 
 
-try:
-    client = find_client()
-    print(colored('Using client:', 'green'), colored(client, 'yellow', attrs=['bold']))
-except FileNotFoundError:
-    print(colored('Client executable not found.', 'red'), file=sys.stderr)
-    exit(1)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run tests for the client.')
+    parser.add_argument('-c', '--client', type=str, help='Path to the client executable.')
+    args = parser.parse_args()
 
-cmds, outputs = parse_cases(CASES)
-if len(cmds) != len(outputs):
-    print(colored('Number of commands and outputs do not match.', 'red'), file=sys.stderr)
-    exit(1)
+    try:
+        client = find_client(args.client)
+        print(colored('Using client:', 'green'), colored(client, 'yellow', attrs=['bold']))
+    except FileNotFoundError as err:
+        print(colored(err, 'red', attrs=['bold']), file=sys.stderr)
+        print(colored('Please provide the path to the client executable using the --client flag.', 'cyan'))
+        print(colored('Example:', 'cyan'), colored(f'{sys.argv[0]} --client /path/to/client', 'yellow', attrs=['bold']))
+        print(colored('Alternatively, place the client executable in the current working directory.', 'cyan'))
+        print(colored('Ensure the client executable is named', 'cyan'), colored('client', 'yellow',
+                                                                                attrs=['bold', 'reverse']))
+        print(colored('For more options, run', 'cyan'), colored(f'{sys.argv[0]} --help', 'yellow', attrs=['bold']))
+        exit(1)
+    except PermissionError as err:
+        print(colored(err, 'red'), file=sys.stderr)
+        print(colored('Ensure the client executable has execute permissions.', 'cyan'))
+        exit(1)
 
-try:
-    run_commands(cmds, outputs)
-except ConnectionError as err:
-    print(colored(err, 'red'), file=sys.stderr)
-    exit(1)
-except subprocess.CalledProcessError as err:
-    error = err.output.decode('utf-8').strip()
-    if error:
-        print(colored(error, 'red'), file=sys.stderr)
-    else:
-        print(colored('Command failed with exit status.'), colored(err.returncode, 'blue', attrs=['bold']),
-              file=sys.stderr)
-    exit(1)
+    # Replace './client' with the actual client path in the CASES string
+    formatted_cases = CASES.replace('./client', client)
 
-print(colored('All tests passed.', 'green'))
+    cmds, outputs = parse_cases(formatted_cases)
+    if len(cmds) != len(outputs):
+        print(colored('Number of commands and outputs do not match.', 'red'), file=sys.stderr)
+        exit(1)
+
+    try:
+        run_commands(cmds, outputs)
+    except ConnectionError as err:
+        print(colored(err, 'red'), file=sys.stderr)
+        exit(1)
+    except subprocess.CalledProcessError as err:
+        error = err.output.decode('utf-8').strip()
+        if error:
+            print(colored(error, 'red'), file=sys.stderr)
+        else:
+            print(colored('Command failed with exit status', 'red'),
+                  colored(err.returncode, 'blue', attrs=['bold']), file=sys.stderr)
+        exit(1)
+
+    print(colored('All tests passed.', 'green'))
