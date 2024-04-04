@@ -23,9 +23,9 @@ endif ()
 # Additional options for the Debug build
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wpedantic")
 
-# Sanitizers for debugging (Disabled by default, slows down the program. Uncomment to enable)
-# GCC does not support all sanitizers, so Clang is recommended for this purpose. Requires llvm-symbolizer
-# The build type should be RelWithDebInfo (or Debug) for sanitizers to work properly
+# Sanitizers for debugging (Disabled by default, slows down the program. Uncomment to enable.)
+# GCC does not support all sanitizers, so Clang is recommended for this purpose. Requires llvm-symbolizer.
+# The build type should be RelWithDebInfo (or Debug, adjust the variables appropriately) for sanitizers to work properly.
 if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
     # Address, leak, undefined, integer, nullability sanitizers
     set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=address,leak,undefined,integer,nullability -fno-omit-frame-pointer -g")
@@ -60,7 +60,8 @@ add_executable(server
         data_structures/trees/heap.c
         data_structures/trees/heap.h
         data_structures/queue/deque_c.c
-        data_structures/queue/deque_c.h)
+        data_structures/queue/deque_c.h
+        commands.h)
 
 add_executable(client
         client.c

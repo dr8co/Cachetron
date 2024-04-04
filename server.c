@@ -19,6 +19,7 @@
 #include "data_structures/trees/heap.h"
 #include "thread_pool.h"
 #include "common.h"
+#include "commands.h"
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
 #if __GNUC__ >= 13 || __clang_major__ >= 19
@@ -986,6 +987,16 @@ static void do_exists(const ptr_vector *cmd, string_c *out) {
     out_int(out, n);
 }
 
+static void do_command(const ptr_vector *cmd, string_c *out) {
+    string_c *tmp = string_new();
+    if (ptr_vector_size(cmd) >= 2) {
+        if (string_case_compare_cstr(ptr_vector_at(cmd, 1), "list"))
+            string_append_cstr(tmp, commands_list);
+    } else string_append_cstr(tmp, commands_description);
+
+    out_str(out, tmp, string_length(tmp));
+    string_free(tmp);
+}
 
 /**
  * @brief Compares a string with a command string, ignoring case.
@@ -1016,12 +1027,14 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         do_set(cmd, out);
     } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "del")) {
         do_del(cmd, out);
-    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "pexpire")) {
+    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "expire")) {
         do_expire(cmd, out);
     } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "pttl")) {
         do_ttl(cmd, out);
     } else if (cmd_is(ptr_vector_at(cmd, 0), "exists")) {
         do_exists(cmd, out);
+    } else if (cmd_is(ptr_vector_at(cmd, 0), "command")) {
+        do_command(cmd, out);
     } else if (ptr_vector_size(cmd) == 4 && cmd_is(ptr_vector_at(cmd, 0), "zadd")) {
         do_zadd(cmd, out);
     } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "zrem")) {
@@ -1030,7 +1043,7 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         do_zscore(cmd, out);
     } else if (ptr_vector_size(cmd) == 6 && cmd_is(ptr_vector_at(cmd, 0), "zquery")) {
         do_zquery(cmd, out);
-    }else if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "shutdown")) {
+    } else if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "shutdown")) {
         g_running = false;
         string_c *tmp = string_new();
         string_append_cstr(tmp, "Server is shutting down...");
@@ -1043,7 +1056,6 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         out_err(out, ERR_UNKNOWN, tmp);
         string_free(tmp);
     }
-    // TODO: Command, Command expire
 }
 
 /**
