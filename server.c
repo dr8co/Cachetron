@@ -759,7 +759,6 @@ static void do_expire(const ptr_vector *cmd, string_c *out) {
     }
     Entry key;
     entry_init(&key);
-    // key.key.swap(cmd[1]);
     string_swap(key.key, ptr_vector_at(cmd, 1));
     key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
 
@@ -953,15 +952,38 @@ static void do_zquery(const ptr_vector *cmd, string_c *out) {
     end_arr(out, ctx, n);
 }
 
-static void do_exists(const ptr_vector *cmd, string_c *out) {
-    Entry key;
-    entry_init(&key);
-    string_swap(key.key, ptr_vector_at(cmd, 1));
-    key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
+static unsigned int exists(string_c *key) {
+    Entry ent;
+    entry_init(&ent);
+    string_swap(ent.key, key);
+    ent.node.hcode = fnv1a_hash((uint8_t *) ent.key->data, string_length(ent.key));
 
-    const HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
-    out_int(out, node ? 1 : 0);
-    entry_free(&key);
+    const HNode *node = hm_lookup(&g_data.db, &ent.node, &entry_eq);
+    entry_free(&ent);
+    return node ? 1 : 0;
+}
+
+static void do_exists(const ptr_vector *cmd, string_c *out) {
+    // Remove duplicate queries
+    ptr_vector *tmp = ptr_vector_new();
+    for (size_t i = 1; i < ptr_vector_size(cmd); ++i) {
+        bool found = false;
+        for (size_t j = 0; j < ptr_vector_size(tmp); ++j) {
+            if (string_compare(ptr_vector_at(cmd, i), ptr_vector_at(tmp, j)) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            ptr_vector_push_back(tmp, ptr_vector_at(cmd, i));
+    }
+    // Count the number of existing keys
+    unsigned int n = 0;
+    for (size_t i = 0; i < ptr_vector_size(tmp); ++i) {
+        n += exists(ptr_vector_at(tmp, i));
+    }
+    ptr_vector_free(tmp);
+    out_int(out, n);
 }
 
 
@@ -998,7 +1020,7 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         do_expire(cmd, out);
     } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "pttl")) {
         do_ttl(cmd, out);
-    } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "exists")) {
+    } else if (cmd_is(ptr_vector_at(cmd, 0), "exists")) {
         do_exists(cmd, out);
     } else if (ptr_vector_size(cmd) == 4 && cmd_is(ptr_vector_at(cmd, 0), "zadd")) {
         do_zadd(cmd, out);
@@ -1021,6 +1043,7 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         out_err(out, ERR_UNKNOWN, tmp);
         string_free(tmp);
     }
+    // TODO: Command, Command expire
 }
 
 /**
