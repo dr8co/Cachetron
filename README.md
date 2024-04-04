@@ -5,7 +5,7 @@
 Cachetron is a simple in-memory data structure store that can be used as
 an application cache or a quick-response database.
 
-It is a key-value store that provides access to data structures via
+It is **a key-value store** that provides access to data structures via
 a set of commands that are sent using a client-server model with TCP sockets.
 
 ## Supported Commands
@@ -100,7 +100,7 @@ or you stop it using `Ctrl+C` or by sending appropriate signals to the process.
 
 ## Testing
 
-A python script is provided to run tests on the server.
+A [python script](./test_cmds.py) is provided to run tests on the server.
 
 To run the script, you will need to have Python 3.11 or later
 and the following packages installed:
