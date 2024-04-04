@@ -45,6 +45,7 @@ add_executable(server
         common.h
         thread_pool.c
         thread_pool.h
+        commands.h
         data_structures/trees/avl.c
         data_structures/trees/avl.h
         data_structures/vector/vector_c.c
@@ -60,8 +61,7 @@ add_executable(server
         data_structures/trees/heap.c
         data_structures/trees/heap.h
         data_structures/queue/deque_c.c
-        data_structures/queue/deque_c.h
-        commands.h)
+        data_structures/queue/deque_c.h)
 
 add_executable(client
         client.c

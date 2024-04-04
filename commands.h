@@ -1,5 +1,9 @@
 #pragma once
 
+#if __cplusplus
+extern "C" {
+#endif
+
 char commands_list[] = "All supported commands:\n"
         "1.  get\n"
         "2.  set\n"
@@ -54,3 +58,7 @@ char commands_description[] = "All supported commands:\n\n"
         "     If the argument is 'list', all supported commands are listed instead.\n\n"
         "13. shutdown: This command shuts down the server.\n\n"
         "All commands are processed case-insensitively.\n";
+
+#if __cplusplus
+}
+#endif
