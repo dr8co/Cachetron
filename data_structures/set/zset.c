@@ -27,8 +27,14 @@ static ZNode *znode_new(const char *name, const size_t len, const double score) 
     return nullptr;
 }
 
-static size_t min(const size_t lhs, const size_t rhs) {
-    return lhs < rhs ? lhs : rhs;
+/**
+ * @brief Returns the minimum of two unsigned integers.
+ *
+ * @param x, y unsigned integers.
+ * @return The minimum of \p x and \p y.
+ */
+static inline size_t min(const size_t x, const size_t y) {
+    return y ^ ((x ^ y) & -(x < y));
 }
 
 /**
@@ -89,7 +95,7 @@ static bool zless(const AVLNode *lhs, const double score, const char *name, cons
  */
 static bool zless2(const AVLNode *lhs, const AVLNode *rhs) {
     const ZNode *zr = container_of(rhs, ZNode, tree);
-    return zr ? zless(lhs, zr->score, zr->name, zr->len) : false;
+    return zr && zless(lhs, zr->score, zr->name, zr->len);
 }
 
 /**
@@ -169,7 +175,7 @@ ZNode *zset_query(const ZSet *zset, const double score, const char *name, const 
         if (zless(cur, score, name, len)) {
             cur = cur->right;
         } else {
-            found = cur; // candidate
+            found = cur; // Candidate
             cur = cur->left;
         }
     }
@@ -215,14 +221,14 @@ static void tree_dispose(const AVLNode *node) {
  * @param node The ZNode to insert.
  */
 static void tree_add(ZSet *zset, ZNode *node) {
-    AVLNode *cur = nullptr; // current node
-    AVLNode **from = &zset->tree; // the incoming pointer to the next node
+    AVLNode *cur = nullptr; // The current node
+    AVLNode **from = &zset->tree; // The incoming pointer to the next node
     while (*from) {
-        // tree search
+        // Tree search
         cur = *from;
         from = zless2(&node->tree, cur) ? &cur->left : &cur->right;
     }
-    *from = &node->tree; // attach the new node
+    *from = &node->tree; // Attach the new node
     node->tree.parent = cur;
     zset->tree = avl_fix(&node->tree);
 }

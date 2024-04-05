@@ -60,6 +60,11 @@ ZNode *znode_offset(ZNode *node, int64_t offset);
 
 void znode_del(ZNode *node);
 
+/**
+ * @brief Initialize a ZSet instance.
+ *
+ * @param zset A pointer to the ZSet instance to be initialized.
+ */
 static inline void zset_init(ZSet *zset) {
     zset->tree = nullptr;
     zset->hmap.resizing_pos = 0;
@@ -71,6 +76,11 @@ static inline void zset_init(ZSet *zset) {
     zset->hmap.ht2.tab = nullptr;
 }
 
+/**
+ * @brief Initialize a ZNode instance.
+ *
+ * @param node A pointer to the ZNode instance to be initialized.
+ */
 static inline void znode_init(ZNode *node) {
     avl_init(&node->tree);
     node->hmap.next = nullptr;
