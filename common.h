@@ -3,6 +3,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#if __cplusplus
+extern "C" {
+#endif
+
 #if !(__GNUC__ >= 13 || __clang_major__ >= 19)
 #define constexpr const
 #endif
@@ -40,7 +44,7 @@
 static inline uint64_t fnv1a_hash(const uint8_t *data, const size_t len) {
     // FNV offset basis and FNV prime are two constants used in the FNV-1a hash algorithm.
     constexpr uint64_t FNV_offset_basis = 0xcbf29ce484222325ULL;
-    constexpr uint64_t FNV_prime[[maybe_unused]] = 0x00000100000001b3ULL;
+    [[maybe_unused]] constexpr uint64_t FNV_prime = 0x00000100000001b3ULL;
 
     // Initialize the hash to the FNV offset basis
     uint64_t hash = FNV_offset_basis;
@@ -74,3 +78,7 @@ enum {
     SER_DBL = 4, ///< Represents a double value.
     SER_ARR = 5, ///< Represents an array.
 };
+
+#if __cplusplus
+}
+#endif
