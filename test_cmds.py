@@ -2,6 +2,7 @@
 import os
 import sys
 import shlex
+import atexit
 import argparse
 import subprocess
 from time import sleep
@@ -108,13 +109,24 @@ def start_server(server_path: str) -> None:
         :return: None
         """
         global server_pid
-        import subprocess
         server_process = subprocess.Popen([server_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         server_pid.value = server_process.pid
 
     server_process_ = Process(target=run_server)
     server_process_.start()
     sleep(0.5)  # Wait for the server to start
+
+
+def stop_server() -> None:
+    """
+    Stops the server.
+    :return: None
+    """
+    if server_pid.value:
+        try:
+            os.kill(server_pid.value, 9)
+        except OSError:
+            pass
 
 
 def find_executable(executable_name: str, executable_path: str = None) -> str:
@@ -124,8 +136,6 @@ def find_executable(executable_name: str, executable_path: str = None) -> str:
     :param executable_path: Optional path to the executable.
     :return: Absolute path to the executable.
     """
-    import os
-
     # Check if the provided path, if any, is valid
     if executable_path is not None:
         if os.path.isfile(executable_path):
@@ -251,12 +261,17 @@ def print_help(executable: str) -> None:
 
 
 if __name__ == '__main__':
+    # Stop the server when the script exits
+    atexit.register(stop_server)
+
+    # Parse command line arguments
     parser = argparse.ArgumentParser(description='Run tests for the client.')
     parser.add_argument('--client', type=str, help='path to the client executable')
     parser.add_argument('--server', type=str, help='path to the server executable')
     parser.add_argument('--no-color', action='store_true', help='disable colored output')
     args = parser.parse_args()
 
+    # Disable colored output if requested
     if args.no_color:
         os.environ['NO_COLOR'] = '1'
 
@@ -338,10 +353,3 @@ if __name__ == '__main__':
     else:
         print(colored('Some tests failed.', 'red'), file=sys.stderr)
         exit(1)
-
-    # Terminate the server if still running
-    if server_pid.value:
-        try:
-            os.kill(server_pid.value, 9)
-        except OSError:
-            pass
