@@ -10,6 +10,7 @@
 .idea/**/shelf
 .idea/**/Project_Default.xml
 .idea/**/editor.xml
+.idea/**/.name
 
 # AWS User-specific
 .idea/**/aws.xml
@@ -620,3 +621,6 @@ Temporary Items
 
 # Generated packages
 Packages/
+
+# Poetry
+poetry.lock

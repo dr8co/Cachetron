@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "Cachetron"
+version = "0.1.0"
+description = "A simple in-memory data structure store"
+authors = ["Ian Duncan <dr8co@duck.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+termcolor = "^2.4.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
