@@ -426,16 +426,16 @@ static void out_dbl(string_c *out, double val) {
  *
  * @param out Pointer to the output string.
  * @param code The error code.
- * @param msg Pointer to the error message.
+ * @param msg The error message. Should be a null-terminated string.
  */
-static void out_err(string_c *out, int32_t code, const string_c *msg) {
+static void out_err(string_c *out, int32_t code, const char *msg) {
     string_push_back_bin(out, SER_ERR);
     string_append_cstr_range_bin(out, (char *) &code, 4);
 
-    uint32_t len = string_length(msg);
+    uint32_t len = strlen(msg);
     string_append_cstr_range_bin(out, (char *) &len, 4);
 
-    string_append(out, msg);
+    string_append_cstr(out, msg);
 }
 
 /**
@@ -497,12 +497,9 @@ static void do_get(const ptr_vector *cmd, string_c *out) {
     if (node) {
         const Entry *ent = container_of(node, Entry, node);
         if (ent) {
-            if (ent->type != T_STR) {
-                string_c *tmp = string_new();
-                string_append_cstr(tmp, "expect string type");
-                out_err(out, ERR_TYPE, tmp);
-                string_free(tmp);
-            } else out_str(out, ent->value, string_length(ent->value));
+            if (ent->type != T_STR)
+                out_err(out, ERR_TYPE, "expect string type");
+            else out_str(out, ent->value, string_length(ent->value));
         }
     } else out_nil(out);
 
@@ -534,19 +531,13 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
         const Entry *ent = container_of(node, Entry, node);
         if (ent) {
             if (ent->type != T_STR) {
-                string_c *tmp = string_new();
-                string_append_cstr(tmp, "expect string type");
-                out_err(out, ERR_TYPE, tmp);
-                string_free(tmp);
+                out_err(out, ERR_TYPE, "expect string type");
                 entry_free_key_value(&key);
                 return;
             }
             string_swap(ent->value, ptr_vector_at(cmd, 2));
         } else {
-            string_c *tmp = string_new();
-            string_append_cstr(tmp, "memory allocation failed");
-            out_err(out, ERR_UNKNOWN, tmp);
-            string_free(tmp);
+            out_err(out, ERR_UNKNOWN, "memory allocation failed");
             entry_free_key_value(&key);
             return;
         }
@@ -561,10 +552,7 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
             string_swap(new_entry->value, ptr_vector_at(cmd, 2));
             hm_insert(&g_data.db, &new_entry->node);
         } else {
-            string_c *tmp = string_new();
-            string_append_cstr(tmp, "memory allocation failed");
-            out_err(out, ERR_UNKNOWN, tmp);
-            string_free(tmp);
+            out_err(out, ERR_UNKNOWN, "memory allocation failed");
             entry_free_key_value(&key);
             return;
         }
@@ -664,10 +652,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
     // Parse the score from the command arguments
     double score = 0;
     if (!str2dbl(ptr_vector_at(cmd, 2), &score)) {
-        string_c *tmp = string_new();
-        string_append_cstr(tmp, "expected a floating point number");
-        out_err(out, ERR_ARG, tmp);
-        string_free(tmp);
+        out_err(out, ERR_ARG, "expected a floating point number");
         return;
     }
     // Look up or create the ZSet
@@ -692,11 +677,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
                 hm_insert(&g_data.db, &ent->node);
             } else {
                 // Handle memory allocation failure
-                string_c *tmp = string_new();
-                string_append_cstr(tmp, "memory allocation failed");
-                out_err(out, ERR_UNKNOWN, tmp);
-
-                string_free(tmp);
+                out_err(out, ERR_UNKNOWN, "memory allocation failed");
                 entry_free_key_value(&key);
                 entry_free_key_value(ent);
                 free(ent);
@@ -704,11 +685,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
             }
         } else {
             // Handle memory allocation failure
-            string_c *tmp = string_new();
-            string_append_cstr(tmp, "memory allocation failed");
-            out_err(out, ERR_UNKNOWN, tmp);
-
-            string_free(tmp);
+            out_err(out, ERR_UNKNOWN, "memory allocation failed");
             entry_free_key_value(&key);
             return;
         }
@@ -716,11 +693,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
         // If the key exists, check if it is of the correct type
         ent = container_of(hnode, Entry, node);
         if (ent->type != T_ZSET) {
-            string_c *tmp = string_new();
-            string_append_cstr(tmp, "expect zset type");
-            out_err(out, ERR_TYPE, tmp);
-
-            string_free(tmp);
+            out_err(out, ERR_TYPE, "expect zset type");
             entry_free_key_value(&key);
             return;
         }
@@ -760,11 +733,7 @@ static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
     }
     *ent = container_of(hnode, Entry, node);
     if ((*ent)->type != T_ZSET) {
-        string_c *tmp = string_new();
-        string_append_cstr(tmp, "expect zset type");
-        out_err(out, ERR_TYPE, tmp);
-
-        string_free(tmp);
+        out_err(out, ERR_TYPE, "expect zset type");
         entry_free_key_value(&key);
         return false;
     }
@@ -876,10 +845,7 @@ static bool str2int(const string_c *str, int64_t *val);
 static void do_expire(const ptr_vector *cmd, string_c *out) {
     int64_t ttl_ms = 0;
     if (!str2int(ptr_vector_at(cmd, 2), &ttl_ms)) {
-        string_c *tmp = string_new();
-        string_append_cstr(tmp, "expect int64 type");
-        out_err(out, ERR_ARG, tmp);
-        string_free(tmp);
+        out_err(out, ERR_ARG, "expect int64 type");
         return;
     }
     Entry key;
@@ -1106,19 +1072,13 @@ static void do_zquery(const ptr_vector *cmd, string_c *out) {
     // Parse args
     double score = 0;
     if (!str2dbl(ptr_vector_at(cmd, 2), &score)) {
-        string_c *tmp = string_new();
-        string_append_cstr(tmp, "invalid score");
-        out_err(out, ERR_ARG, tmp);
-        string_free(tmp);
+        out_err(out, ERR_ARG, "invalid score");
         return;
     }
     const string_c *name = ptr_vector_at(cmd, 3);
     int64_t offset = 0, limit = 0;
     if (!str2int(ptr_vector_at(cmd, 4), &offset) || !str2int(ptr_vector_at(cmd, 5), &limit)) {
-        string_c *tmp = string_new();
-        string_append_cstr(tmp, "invalid offset or limit");
-        out_err(out, ERR_ARG, tmp);
-        string_free(tmp);
+        out_err(out, ERR_ARG, "invalid offset or limit");
         return;
     }
     // Get the ZSet
@@ -1166,9 +1126,11 @@ static unsigned int exists(string_c *key) {
     Entry ent;
     entry_init(&ent);
     string_swap(ent.key, key);
+
     ent.node.hcode = fnv1a_hash((uint8_t *) ent.key->data, string_length(ent.key));
     const HNode *node = hm_lookup(&g_data.db, &ent.node, &entry_eq);
     entry_free_key_value(&ent);
+
     return node ? 1 : 0;
 }
 
@@ -1280,10 +1242,7 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         string_free(tmp);
     } else {
         // cmd is not recognized
-        string_c *tmp = string_new();
-        string_append_cstr(tmp, "Unknown cmd");
-        out_err(out, ERR_UNKNOWN, tmp);
-        string_free(tmp);
+        out_err(out, ERR_UNKNOWN, "Unknown cmd");
     }
 }
 
@@ -1331,10 +1290,7 @@ static bool try_one_request(Conn *conn) {
     // pack the response into the buffer
     if (4 + string_length(out) > k_max_msg) {
         string_clear(out);
-        string_c *tmp = string_new();
-        string_append_cstr(tmp, "Response is too big");
-        out_err(out, ERR_2BIG, tmp);
-        string_free(tmp);
+        out_err(out, ERR_2BIG, "Response is too big");
     }
 
     // Copy the response length to the response buffer
