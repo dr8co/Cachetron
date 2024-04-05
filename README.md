@@ -149,7 +149,13 @@ The client path can be passed with `--client` flag:
 The script will run a series of commands and check the output.
 Unexpected output will be logged to the console.
 
-To suppress color output, set `NO_COLOR` environment variable:
+To suppress color output, run the script with `--no-color` flag:
+
+```bash
+./test_cmds.py --server ./build/server --client ./build/client --no-color
+```
+
+Alternatively, you can set the `NO_COLOR` environment variable:
 
 ```bash
 NO_COLOR=1 ./test_cmds.py --server ./build/server --client ./build/client

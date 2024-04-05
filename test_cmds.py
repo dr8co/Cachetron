@@ -208,6 +208,7 @@ def run_commands(cmds_: List[str], outputs_: List[str]) -> bool:
             print(colored(f"Command '", 'red'), end='')
             print(colored(cmd_no_name, 'blue', attrs=['bold', 'underline']), end='')
             print(colored("' did not complete within the specified timeout.", 'red'))
+            success = False
             continue
 
         # Handle non-zero exit status
@@ -253,7 +254,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run tests for the client.')
     parser.add_argument('--client', type=str, help='path to the client executable')
     parser.add_argument('--server', type=str, help='path to the server executable')
+    parser.add_argument('--no-color', action='store_true', help='disable colored output')
     args = parser.parse_args()
+
+    if args.no_color:
+        os.environ['NO_COLOR'] = '1'
 
     # The server must be running
     if not is_server_running():
