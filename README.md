@@ -23,7 +23,7 @@ Cachetron supports the following commands:
 - `EXISTS <key>`: Check if a key exists.
 - `EXPIRE <key> <milliseconds>`: Set a key to expire in `milliseconds` milliseconds.
 - `TTL <key>`: Get the time-to-live of a key in milliseconds.
-- `COMMAND` [list]: Get a list of all commands or their verbose descriptions.
+- `COMMAND [list]`: Get a list of all commands or their verbose descriptions.
 - `SHUTDOWN`: Shutdown the server.
 
 These commands are similar to those provided by Redis, but Cachetron is not
@@ -57,8 +57,8 @@ cd Cachetron
 # Configure CMake
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
 
-# Build the project
-cmake --build build --target all -j 4
+# Build the server and client binaries
+cmake --build build --target server client -j 4
 ```
 
 Replace `-G Ninja` with `-G "Unix Makefiles"` if you don't have Ninja installed,
@@ -106,9 +106,9 @@ To run the script, you will need to have Python 3.11 or later
 and the following packages installed:
 
 - `termcolor`
-- `poetry` (optional, for managing dependencies)
+- `poetry` (optional, for managing the environment and dependencies)
 
-[Pyproject.toml](./pyproject.toml) contains the poetry configuration.
+[Pyproject.toml](./pyproject.toml) contains the poetry configuration.\
 Use it to install the dependencies and activate the virtual environment:
 
 ```bash
