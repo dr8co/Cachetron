@@ -12,10 +12,10 @@ extern "C" {
  */
 struct Deque {
     size_t capacity; ///< The capacity of the deque.
-    size_t size; ///< The number of elements in the deque.
-    size_t front; ///< The index of the front element.
-    size_t back; ///< The index of the back element.
-    void **data; ///< The array storing the elements of the deque.
+    size_t size;     ///< The number of elements in the deque.
+    size_t front;    ///< The index of the front element.
+    size_t back;     ///< The index of the back element.
+    void **data;     ///< The array storing the elements of the deque.
 };
 
 typedef struct Deque Deque;
