@@ -46,8 +46,13 @@ void vector_free(vector_c *const restrict v) {
     }
 }
 
-// Round up x to the next power of 2
-static size_t clp2(unsigned x) {
+/**
+ * @brief Computes the smallest power of 2 greater than or equal to the input integer.
+ *
+ * @param x The input integer.
+ * @return The smallest power of 2 greater than or equal to the input integer.
+ */
+__attribute_pure__ static size_t clp2(size_t x) {
     --x;
     x |= x >> 1;
     x |= x >> 2;
@@ -86,7 +91,6 @@ static bool vector_resize(vector_c *const restrict v, size_t size) {
             v->capacity = size;
         }
         return true;
-
     }
     return false;
 }
@@ -241,7 +245,7 @@ bool vector_insert(vector_c *const restrict v, const size_t index, const void *c
  * @note This function uses bitwise operations to calculate the maximum of two unsigned integers.\n
  * It does not use conditional statements, which makes it faster in some cases.
  */
-__inline static unsigned max(const unsigned x, const unsigned y) {
+static inline size_t max(const size_t x, const size_t y) {
     return x ^ ((x ^ y) & -(x < y));
 }
 

@@ -9,7 +9,7 @@ extern "C" {
  * @brief A structure representing a dynamic array in C.
  */
 struct vector_c {
-    void *data;          ///< A void pointer to the data the vector holds. This allows the vector to hold any type of data.
+    void *data;          ///< A void pointer to the data the vector holds.
     size_t size;         ///< The current number of elements in the vector.
     size_t capacity;     ///< The total number of elements the vector can currently hold before it needs to resize.
     size_t element_size; ///< The size of each element in the vector.
