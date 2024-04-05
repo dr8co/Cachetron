@@ -36,7 +36,7 @@ static inline void dlist_init(DList *node) {
  * @return true if the node is a standalone node, false otherwise.
  */
 static inline bool dlist_empty(const DList *node) {
-    return node ? node->next == node : true;
+    return node == nullptr || node->next == node;
 }
 
 void dlist_detach(const DList *node);
