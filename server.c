@@ -46,17 +46,6 @@ enum {
 };
 
 /**
- * @brief Enum representing the result of a command.
- *
- * This enum is used to represent the result of a command in the server.
- */
-enum {
-    RES_OK = 0, ///< The command was successful.
-    RES_ERR = 1, ///< There was an error executing the command.
-    RES_NX = 2 ///< The command was not executed.
-};
-
-/**
  * @brief Structure representing a connection.
  *
  * This structure is used to manage a connection in the server.
@@ -190,7 +179,6 @@ static int32_t accept_new_conn(const int fd) {
     close(connfd);
     return -1;
 }
-
 static void state_req(Conn *conn);
 
 static void state_res(Conn *conn);
@@ -222,7 +210,8 @@ static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out)
     size_t pos = 4;
     int j = 0;
 
-    while (n--) {
+    while (n > 0) {
+        --n;
         // Get the length of the argument
         if (pos + 4 > len) return -1;
         uint32_t sz = 0;
@@ -274,7 +263,7 @@ static void entry_init(Entry *entry) {
     init_hnode(&entry->node);
     entry->key = string_new();
     entry->value = string_new();
-    entry->type = 0;
+    entry->type = T_STR;
     entry->zset = nullptr;
     entry->heap_idx = SIZE_MAX;
 }
@@ -507,8 +496,7 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
         // If the key is not found, create a new Entry structure and insert it into the hash map
         Entry *new_entry = malloc(sizeof(Entry));
         if (new_entry) {
-            new_entry->key = string_new();
-            new_entry->value = string_new();
+            entry_init(new_entry);
 
             string_swap(new_entry->key, key.key);
             new_entry->node.hcode = key.node.hcode;
@@ -549,7 +537,7 @@ static void entry_del_async(void *arg) {
 
 // Dispose the entry after it got detached from the key space
 static void entry_del(Entry *ent) {
-    entry_set_ttl(ent, SIZE_MAX);
+    entry_set_ttl(ent, -1);
     constexpr size_t k_large_container_size = 10'000;
     bool too_big = false;
 
@@ -597,7 +585,7 @@ static void do_del(const ptr_vector *cmd, string_c *out) {
  * @param node Pointer to the hash node to be scanned.
  * @param arg Pointer to the argument to be passed to the function.
  */
-static void cb_scan(const HNode *node, void *arg) {
+static void cb_scan(HNode *node, void *arg) {
     string_c *out = arg;
     const string_c *tmp = container_of(node, Entry, node)->key;
     out_str(out, tmp, string_length(tmp));
@@ -617,7 +605,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
     // Look up or create the ZSet
     Entry key;
     entry_init(&key);
-    assert(string_swap(key.key, ptr_vector_at(cmd, 1)));
+    string_swap(key.key, ptr_vector_at(cmd, 1));
     key.node.hcode = fnv1a_hash((uint8_t *) key.key->data, string_length(key.key));
     const HNode *hnode = hm_lookup(&g_data.db, &key.node, &entry_eq);
 
@@ -740,7 +728,10 @@ static void process_timers() {
         constexpr size_t k_max_works = 2000;
         Entry *ent = container_of(((HeapItem *) vector_at(g_data.heap, 0))->ref, Entry, heap_idx);
         const HNode *node = hm_pop(&g_data.db, &ent->node, &compare_hnode);
-        assert(node == &ent->node);
+        if(node != &ent->node){
+            puts("node != &ent->node\n");
+            return;
+        }
         entry_del(ent);
 
         if (nworks++ >= k_max_works) break;
@@ -792,7 +783,7 @@ static void do_ttl(const ptr_vector *cmd, string_c *out) {
     }
     const uint64_t expire_at = ((HeapItem *) vector_at(g_data.heap, ent->heap_idx))->val;
     const uint64_t now_us = get_monotonic_usec();
-    out_int(out, expire_at > now_us ? (expire_at - now_us) / 1000 : 0);
+    out_int(out, expire_at > now_us ? (int64_t) (expire_at - now_us) / 1000 : 0);
     entry_free(&key);
 }
 
@@ -819,7 +810,7 @@ static void entry_set_ttl(Entry *ent, const int64_t ttl_ms) {
     } else if (ttl_ms >= 0) {
         size_t pos = ent->heap_idx;
         if (pos == SIZE_MAX) {
-            // add an new item to the heap
+            // add a new item to the heap
             HeapItem item;
             item.ref = &ent->heap_idx;
             vector_push_back(g_data.heap, &item);
@@ -861,8 +852,8 @@ static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
  */
 static void do_keys(const ptr_vector *cmd [[maybe_unused]], string_c *out) {
     out_arr(out, hm_size(&g_data.db));
-    h_scan(&g_data.db.ht1, (void (*)(HNode *, void *)) &cb_scan, out);
-    h_scan(&g_data.db.ht2, (void (*)(HNode *, void *)) &cb_scan, out);
+    h_scan(&g_data.db.ht1,  &cb_scan, out);
+    h_scan(&g_data.db.ht2,  &cb_scan, out);
 }
 
 static bool str2dbl(const string_c *str, double *val) {
@@ -1332,11 +1323,11 @@ int main() {
             pfd2.fd = conn->fd;
             // Set the events based on the connection state
             pfd2.events = conn->state == STATE_REQ ? POLLIN : POLLOUT;
-            pfd2.events = pfd2.events | POLLERR;
+            pfd2.events = (short) ( pfd2.events | POLLERR);
             vector_push_back(poll_args, &pfd2);
         }
         // Poll for events
-        const int timeout_ms = next_timer();
+        const int timeout_ms = (int) next_timer();
         rv = poll(vector_data(poll_args), vector_size(poll_args), timeout_ms);
         if (rv < 0) die("poll");
 
