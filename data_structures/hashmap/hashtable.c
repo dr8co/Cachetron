@@ -14,12 +14,12 @@ enum : size_t {
 
 
 /**
- * @brief Computes the smallest power of 2 greater than or equal to the input number.
+ * @brief Computes the smallest power of 2 greater than or equal to the input integer.
  *
- * @param x The input number.
- * @return The smallest power of 2 greater than or equal to the input number.
+ * @param x The input integer.
+ * @return The smallest power of 2 greater than or equal to the input integer.
  */
-static size_t clp2(size_t x) {
+__attribute_pure__ static size_t clp2(size_t x) {
     --x;
     x |= x >> 1;
     x |= x >> 2;
@@ -47,7 +47,10 @@ static void h_init(HTab *htab, size_t n) {
     // Round up n to the next power of 2 if it's not already a power of 2
     if ((n & (n - 1)) != 0) n = clp2(n);
 
+    // Allocate memory for the table
     htab->tab = (HNode **) calloc(sizeof(HNode *), n);
+
+    // Initialize the mask and size
     htab->mask = n - 1;
     htab->size = 0;
 }
@@ -64,6 +67,7 @@ static void h_insert(HTab *htab, HNode *node) {
     const size_t pos = node->hcode & htab->mask;
     // Get the node currently at the calculated position
     HNode *next = htab->tab[pos];
+
     // Set the next of the node to be inserted to the node currently at the calculated position
     node->next = next;
     // Insert the node at the calculated position
@@ -85,7 +89,7 @@ static void h_insert(HTab *htab, HNode *node) {
 static HNode **h_lookup(const HTab *htab, HNode *key, bool (*eq)(const HNode *, const HNode *)) {
     if (htab->tab) {
         const size_t pos = key->hcode & htab->mask;
-        HNode **from = &htab->tab[pos]; // incoming pointer to the result
+        HNode **from = &htab->tab[pos]; // Incoming pointer to the result
         for (HNode *cur; (cur = *from) != nullptr; from = &cur->next) {
             if (cur->hcode == key->hcode && eq(cur, key)) {
                 return from;
@@ -129,9 +133,8 @@ static void hm_help_resizing(HMap *hmap) {
             continue;
         }
         h_insert(&hmap->ht1, h_detach(&hmap->ht2, from));
-        nwork++;
+        ++nwork;
     }
-
     if (hmap->ht2.size == 0 && hmap->ht2.tab) {
         // Done
         free(hmap->ht2.tab);

@@ -12,7 +12,7 @@ extern "C" {
  */
 struct HNode {
     struct HNode *next; ///< A pointer to the next node in the hash table.
-    uint64_t hcode; ///< The hash code of the node.
+    uint64_t hcode;     ///< The hash code of the node.
 };
 
 typedef struct HNode HNode;
@@ -37,8 +37,8 @@ typedef struct HTab HTab;
  * It contains two hash tables (\p ht1 and \p ht2), and a resizing position.
  */
 struct HMap {
-    HTab ht1; ///< The newer hash table.
-    HTab ht2; ///< The older hash table.
+    HTab ht1;            ///< The newer hash table.
+    HTab ht2;            ///< The older hash table.
     size_t resizing_pos; ///< The current position in the resizing process.
 };
 
@@ -54,17 +54,32 @@ size_t hm_size(const HMap *hmap);
 
 void hm_destroy(HMap *hmap);
 
+/**
+ * @brief Initialize a hash node.
+ *
+ * @param node A pointer to the hash node to be initialized.
+ */
 static inline void init_hnode(HNode *node) {
-    node->next = NULL;
+    node->next = nullptr;
     node->hcode = 0;
 }
 
+/**
+ * @brief Initialize a hash table.
+ *
+ * @param htab A pointer to the hash table to be initialized.
+ */
 static inline void init_htab(HTab *htab) {
-    htab->tab = NULL;
+    htab->tab = nullptr;
     htab->mask = 0;
     htab->size = 0;
 }
 
+/**
+ * @brief Initialize a hash map.
+ *
+ * @param hmap A pointer to the hash map to be initialized.
+ */
 static inline void init_hmap(HMap *hmap) {
     init_htab(&hmap->ht1);
     init_htab(&hmap->ht2);
