@@ -329,6 +329,16 @@ enum {
     ERR_ARG = 4      ///< Represents an error when the argument is invalid.
 };
 
+/**
+ * @brief Appends a range of characters from a C-string to a string_c object.
+ *
+ * @param s A pointer to the string_c object to which the characters will be appended.
+ * @param cstr A pointer to the C-string from which the characters will be copied.
+ * @param count The number of characters to copy from the C-string.
+ * @return True if the operation was successful, false otherwise.
+ *
+ * @note This function is similar to \p string_append_cstr_range(), but it also works with binary data.
+ */
 static bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr,
                                          const size_t count) {
     if (s) {
@@ -346,6 +356,15 @@ static bool string_append_cstr_range_bin(string_c *const restrict s, const char 
     return false;
 }
 
+/**
+ * @brief Appends a character to a string_c object.
+ *
+ * @param s A pointer to the string_c object to which the character will be appended.
+ * @param c The character to append.
+ * @return True if the operation was successful, false otherwise.
+ *
+ * @note This function is similar to \p string_push_back(), but it also works with binary data.
+ */
 static bool string_push_back_bin(string_c *const restrict s, const char c) {
     if (s) {
         if (s->size == s->capacity) {
