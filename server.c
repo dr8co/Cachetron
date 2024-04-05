@@ -42,7 +42,7 @@ enum : size_t {
 enum {
     STATE_REQ = 0, ///< Waiting for a request from the client.
     STATE_RES = 1, ///< Sending a response to the client.
-    STATE_END = 2 ///< Connection is closed or needs to be deleted.
+    STATE_END = 2  ///< Connection is closed or needs to be deleted.
 };
 
 /**
@@ -51,14 +51,13 @@ enum {
  * This structure is used to manage a connection in the server.
  */
 struct Conn {
-    int fd; ///< The file descriptor of the connection.
-    uint32_t state; ///< The current state of the connection.
-    uint64_t idle_start; ///< The start time of the idle period.
-    size_t rbuf_size; ///< The size of the read buffer.
-
-    size_t wbuf_size; ///< The size of the write buffer.
-    size_t wbuf_sent; ///< The amount of data already sent from the write buffer.
-    DList idle_list; ///< The list node for idle connections.
+    int fd;                      ///< The file descriptor of the connection.
+    uint32_t state;              ///< The current state of the connection.
+    uint64_t idle_start;         ///< The start time of the idle period.
+    size_t rbuf_size;            ///< The size of the read buffer.
+    size_t wbuf_size;            ///< The size of the write buffer.
+    size_t wbuf_sent;            ///< The amount of data already sent from the write buffer.
+    DList idle_list;             ///< The list node for idle connections.
     uint8_t rbuf[4 + k_max_msg]; ///< The read buffer, used to store incoming data.
     uint8_t wbuf[4 + k_max_msg]; ///< The write buffer, used to store outgoing data.
 };
@@ -85,16 +84,31 @@ static void conn_init(Conn *conn) {
     memset(conn->wbuf, 0, sizeof(conn->wbuf));
 }
 
-static void report_error(const char *msg) {
+/**
+ * @brief Reports an error message.
+ *
+ * @param msg The error message to be reported.
+ */
+static inline void report_error(const char *msg) {
     perror(msg);
 }
 
-static void die(const char *msg) {
+/**
+ * @brief Reports an error message and terminates the program.
+ *
+ * @param msg The error message to be reported.
+ */
+static inline void die(const char *msg) {
     report_error(msg);
     exit(1);
 }
 
-static uint64_t get_monotonic_usec() {
+/**
+ * @brief Gets the current time in microseconds.
+ *
+ * @return The current time in microseconds.
+ */
+static uint64_t get_monotonic_micro() {
     struct timespec tv = {0, 0};
     clock_gettime(CLOCK_MONOTONIC, &tv);
     return (uint64_t) tv.tv_sec * 1'000'000 + tv.tv_nsec / 1000;
@@ -122,11 +136,11 @@ static void fd_set_nb(const int fd) {
  * The database is represented as an instance of the HMap data structure.
  */
 static struct {
-    HMap db; ///< The hash map used by the server to store key-value pairs.
+    HMap db;             ///< The hash map used by the server to store key-value pairs.
     ptr_vector *fd2conn; ///< A map of active connections, keyed by file descriptor.
-    DList idle_conns; ///< A list of idle connections.
-    vector_c *heap; ///< A heap to manage the connections.
-    ThreadPool pool; ///< A thread pool to handle tasks.
+    DList idle_conns;    ///< A list of idle connections.
+    vector_c *heap;      ///< A heap to manage the connections.
+    ThreadPool pool;     ///< A thread pool to handle tasks.
 } g_data;
 
 /**
@@ -137,9 +151,9 @@ static struct {
  */
 static void conn_put(ptr_vector *fd2conn, Conn *conn) {
     // resize the vector if necessary
-    if (ptr_vector_size(fd2conn) <= (size_t) conn->fd) {
+    if (ptr_vector_size(fd2conn) <= (size_t) conn->fd)
         ptr_vector_expand(fd2conn, conn->fd + 1);
-    }
+
     ptr_vector_set(fd2conn, conn->fd, conn);
 }
 
@@ -153,13 +167,13 @@ static int32_t accept_new_conn(const int fd) {
     // Accept a new client connection
     struct sockaddr_in client_addr = {};
     socklen_t socklen = sizeof(client_addr);
-    const int connfd = accept(fd, (struct sockaddr *) &client_addr, &socklen);
-    if (connfd < 0) {
+    const int conn_fd = accept(fd, (struct sockaddr *) &client_addr, &socklen);
+    if (conn_fd < 0) {
         report_error("accept() error");
         return -1; // error
     }
     // Set the new connection file descriptor to non-blocking mode
-    fd_set_nb(connfd);
+    fd_set_nb(conn_fd);
     // Create a new connection structure
     Conn *conn = malloc(sizeof(Conn));
     if (conn) {
@@ -167,18 +181,19 @@ static int32_t accept_new_conn(const int fd) {
         conn_init(conn);
 
         // Set the file descriptor and state of the connection
-        conn->fd = connfd;
+        conn->fd = conn_fd;
         conn->state = STATE_REQ;
-        conn->idle_start = get_monotonic_usec();
+        conn->idle_start = get_monotonic_micro();
         dlist_insert_before(&g_data.idle_conns, &conn->idle_list);
         // Add the connection to the connection vector
         conn_put(g_data.fd2conn, conn);
         return 0;
     }
     // If the connection structure could not be created, close the connection file descriptor
-    close(connfd);
+    close(conn_fd);
     return -1;
 }
+
 static void state_req(Conn *conn);
 
 static void state_res(Conn *conn);
@@ -200,7 +215,6 @@ static void state_res(Conn *conn);
  */
 static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out) {
     if (len < 4) return -1;
-
     // The first 4 bytes represent the number of arguments
     uint32_t n = 0;
     memcpy(&n, &data[0], 4);
@@ -210,6 +224,7 @@ static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out)
     size_t pos = 4;
     int j = 0;
 
+    // Iterate over the arguments
     while (n > 0) {
         --n;
         // Get the length of the argument
@@ -232,9 +247,15 @@ static int32_t parse_req(const uint8_t *data, const size_t len, ptr_vector *out)
     return 0;
 }
 
+/**
+ * @brief Enum representing the types of data that can be stored in the database.
+ *
+ * This enum is used to distinguish between different types of data that can be stored in the database.
+ * Currently, the database supports storing strings and sorted sets (ZSets).
+ */
 enum {
-    T_STR = 0,
-    T_ZSET = 1,
+    T_STR = 0,  ///< Represents a string data type.
+    T_ZSET = 1, ///< Represents a sorted set (ZSet) data type.
 };
 
 /**
@@ -244,11 +265,11 @@ enum {
  * Each entry consists of a key-value pair, the type of the value, and a sorted set (ZSet).
  */
 struct Entry {
-    HNode node; ///< The node used by the hash map. It is used to link the entries in the hash map.
-    string_c *key; ///< The key of the hash map entry. It identifies the entry in the hash map.
+    HNode node;      ///< The node used by the hash map. It is used to link the entries in the hash map.
+    string_c *key;   ///< The key of the hash map entry. It identifies the entry in the hash map.
     string_c *value; ///< The value of the hash map entry. It is the data associated with the key.
-    uint32_t type; ///< The type of the value. It is used to determine how to interpret the value.
-    ZSet *zset; ///< The sorted set associated with the entry.
+    uint32_t type;   ///< The type of the value. It is used to determine how to interpret the value.
+    ZSet *zset;      ///< The sorted set associated with the entry.
     size_t heap_idx; ///< The index of the entry in the heap.
 };
 
@@ -269,11 +290,11 @@ static void entry_init(Entry *entry) {
 }
 
 /**
- * @brief Frees an Entry structure.
+ * @brief Frees the key and value of an Entry structure.
  *
  * @param entry Pointer to the Entry structure to be freed.
  */
-static void entry_free(const Entry *entry) {
+static void entry_free_key_value(const Entry *entry) {
     string_free(entry->key);
     string_free(entry->value);
 }
@@ -303,9 +324,9 @@ static bool entry_eq(const HNode *lhs, const HNode *rhs) {
  */
 enum {
     ERR_UNKNOWN = 1, ///< Represents an unknown error.
-    ERR_2BIG = 2, ///< Represents an error when the data is too big.
-    ERR_TYPE = 3, ///< Represents an error when the data type is invalid.
-    ERR_ARG = 4 ///< Represents an error when the argument is invalid.
+    ERR_2BIG = 2,    ///< Represents an error when the data is too big.
+    ERR_TYPE = 3,    ///< Represents an error when the data type is invalid.
+    ERR_ARG = 4      ///< Represents an error when the argument is invalid.
 };
 
 static bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr,
@@ -371,6 +392,11 @@ static void out_int(string_c *out, int64_t val) {
     string_append_cstr_range_bin(out, (char *) &val, 8);
 }
 
+/**
+ * @brief Appends a double value to the output string.
+ * @param out Pointer to the output string.
+ * @param val The double value to be appended.
+ */
 static void out_dbl(string_c *out, double val) {
     string_push_back_bin(out, SER_DBL);
     string_append_cstr_range_bin(out, (char *) &val, 8);
@@ -404,12 +430,25 @@ static void out_arr(string_c *out, uint32_t n) {
     string_append_cstr_range_bin(out, (char *) &n, 4);
 }
 
+/**
+ * @brief Begins the creation of an array in the output string.
+ *
+ * @param out Pointer to the output string.
+ * @return Pointer to the position in the output string where the array length should be written.
+ */
 static void *begin_arr(string_c *out) {
     string_push_back_bin(out, SER_ARR);
     string_append_cstr_range_bin(out, "\0\0\0\0", 4);
     return (void *) (string_length(out) - 4);
 }
 
+/**
+ * @brief Ends the creation of an array in the output string.
+ *
+ * @param out Pointer to the output string.
+ * @param ctx Pointer to the position in the output string where the array length should be written.
+ * @param n The length of the array.
+ */
 static void end_arr(const string_c *out, void *ctx, const uint32_t n) {
     const size_t pos = (size_t) ctx;
     assert(out->data[pos - 1] == SER_ARR);
@@ -448,7 +487,7 @@ static void do_get(const ptr_vector *cmd, string_c *out) {
         }
     } else out_nil(out);
 
-    entry_free(&key);
+    entry_free_key_value(&key);
 }
 
 /**
@@ -480,7 +519,7 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
                 string_append_cstr(tmp, "expect string type");
                 out_err(out, ERR_TYPE, tmp);
                 string_free(tmp);
-                entry_free(&key);
+                entry_free_key_value(&key);
                 return;
             }
             string_swap(ent->value, ptr_vector_at(cmd, 2));
@@ -489,7 +528,7 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
             string_append_cstr(tmp, "memory allocation failed");
             out_err(out, ERR_UNKNOWN, tmp);
             string_free(tmp);
-            entry_free(&key);
+            entry_free_key_value(&key);
             return;
         }
     } else {
@@ -507,49 +546,46 @@ static void do_set(const ptr_vector *cmd, string_c *out) {
             string_append_cstr(tmp, "memory allocation failed");
             out_err(out, ERR_UNKNOWN, tmp);
             string_free(tmp);
-            entry_free(&key);
+            entry_free_key_value(&key);
             return;
         }
     }
     out_nil(out);
-    entry_free(&key);
+    entry_free_key_value(&key);
 }
 
 static void entry_set_ttl(Entry *ent, int64_t ttl_ms);
 
-// Deallocate the key immediately
+/**
+ * @brief Deallocates an Entry structure.
+ *
+ * @param ent Pointer to the Entry structure to be deallocated.
+ */
 static void entry_destroy(Entry *ent) {
-    switch (ent->type) {
-        case T_ZSET:
-            zset_dispose(ent->zset);
-            free(ent->zset);
-            break;
-        default: ;
+    if (ent->type == T_ZSET) {
+        zset_dispose(ent->zset);
+        free(ent->zset);
     }
-    string_free(ent->key);
-    string_free(ent->value);
+    entry_free_key_value(ent);
     free(ent);
 }
 
-static void entry_del_async(void *arg) {
-    entry_destroy(arg);
-}
-
-// Dispose the entry after it got detached from the key space
+/**
+ * @brief Deletes an entry from the database.
+ *
+ * @param ent Pointer to the Entry structure to be deleted.
+ */
 static void entry_del(Entry *ent) {
+    // Set the time-to-live of the entry to -1, indicating that it should be deleted
     entry_set_ttl(ent, -1);
-    constexpr size_t k_large_container_size = 10'000;
-    bool too_big = false;
 
-    switch (ent->type) {
-        case T_ZSET:
-            too_big = hm_size(&ent->zset->hmap) > k_large_container_size;
-            break;
-        default: ;
+    // If the entry is of type T_ZSET and its size is greater than 10,000, queue the deletion in the thread pool
+    if (ent->type == T_ZSET && hm_size(&ent->zset->hmap) > 10'000) {
+        thread_pool_queue(&g_data.pool, (void (*)(void *)) &entry_destroy, ent);
+    } else {
+        // Otherwise, delete the entry immediately
+        entry_destroy(ent);
     }
-    if (too_big)
-        thread_pool_queue(&g_data.pool, &entry_del_async, ent);
-    else entry_destroy(ent);
 }
 
 /**
@@ -576,7 +612,7 @@ static void do_del(const ptr_vector *cmd, string_c *out) {
 
     out_int(out, node ? 1 : 0);
     // Free the memory allocated for the key in the Entry structure
-    entry_free(&key);
+    entry_free_key_value(&key);
 }
 
 /**
@@ -593,7 +629,20 @@ static void cb_scan(HNode *node, void *arg) {
 
 static bool str2dbl(const string_c *str, double *val);
 
+/**
+ * @brief Handles the "zadd" command.
+ *
+ * This function is used to add a member to a sorted set, or to update the score of an existing member.\n
+ * If the key does not exist, a new sorted set with the specified member as its sole member is created.\n
+ *
+ * If the member already exists in the sorted set,
+ * its score is updated and the element is reinserted at the right position to ensure the correct ordering.
+ *
+ * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_zadd(const ptr_vector *cmd, string_c *out) {
+    // Parse the score from the command arguments
     double score = 0;
     if (!str2dbl(ptr_vector_at(cmd, 2), &score)) {
         string_c *tmp = string_new();
@@ -611,6 +660,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
 
     Entry *ent;
     if (hnode == nullptr) {
+        // If the key does not exist, create a new Entry and ZSet
         ent = malloc(sizeof(Entry));
         if (ent) {
             entry_init(ent);
@@ -622,26 +672,29 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
                 zset_init(ent->zset);
                 hm_insert(&g_data.db, &ent->node);
             } else {
+                // Handle memory allocation failure
                 string_c *tmp = string_new();
                 string_append_cstr(tmp, "memory allocation failed");
                 out_err(out, ERR_UNKNOWN, tmp);
 
                 string_free(tmp);
-                entry_free(&key);
-                entry_free(ent);
+                entry_free_key_value(&key);
+                entry_free_key_value(ent);
                 free(ent);
                 return;
             }
         } else {
+            // Handle memory allocation failure
             string_c *tmp = string_new();
             string_append_cstr(tmp, "memory allocation failed");
             out_err(out, ERR_UNKNOWN, tmp);
 
             string_free(tmp);
-            entry_free(&key);
+            entry_free_key_value(&key);
             return;
         }
     } else {
+        // If the key exists, check if it is of the correct type
         ent = container_of(hnode, Entry, node);
         if (ent->type != T_ZSET) {
             string_c *tmp = string_new();
@@ -649,16 +702,31 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
             out_err(out, ERR_TYPE, tmp);
 
             string_free(tmp);
-            entry_free(&key);
+            entry_free_key_value(&key);
             return;
         }
     }
+    // Add the member to the ZSet with the specified score
     const string_c *tmp = ptr_vector_at(cmd, 3);
     const bool res = zset_add(ent->zset, tmp->data, string_length(tmp), score);
     out_int(out, res);
-    entry_free(&key);
+    entry_free_key_value(&key);
 }
 
+/**
+ * @brief Checks if the provided key corresponds to a ZSET in the database.
+ *
+ * If the key does not exist or if it corresponds to a different type,
+ * it returns false and sends an error message to the client.\n
+ * If the key corresponds to a ZSET, it returns true and sets the 'ent' parameter
+ * to point to the corresponding Entry structure.\n
+ *
+ * @param out Pointer to the string where the response will be stored.
+ * @param s Pointer to the string containing the key to be checked.
+ * @param ent Pointer to a pointer to an Entry structure. If the function returns true,
+ * 'ent' is set to point to the Entry structure corresponding to the key.
+ * @return True if the key corresponds to a ZSET, false otherwise.
+ */
 static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
     Entry key;
     entry_init(&key);
@@ -668,7 +736,7 @@ static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
     const HNode *hnode = hm_lookup(&g_data.db, &key.node, &entry_eq);
     if (hnode == nullptr) {
         out_nil(out);
-        entry_free(&key);
+        entry_free_key_value(&key);
         return false;
     }
     *ent = container_of(hnode, Entry, node);
@@ -678,42 +746,74 @@ static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
         out_err(out, ERR_TYPE, tmp);
 
         string_free(tmp);
-        entry_free(&key);
+        entry_free_key_value(&key);
         return false;
     }
-    entry_free(&key);
+    entry_free_key_value(&key);
     return true;
 }
 
-constexpr uint64_t k_idle_timeout_ms = 5 * 1000;
+constexpr uint64_t k_idle_timeout_ms = 5 * 1000; ///< The idle timeout in milliseconds
 
+/**
+ * @brief Calculates the time until the next timer event.
+ *
+ * This function checks both the idle timers and the TTL timers,
+ * nd returns the time until the earliest event.
+ *
+ * @return The time until the next timer event in microseconds.
+ * If there are no pending events, it returns 10,000.
+ */
 static uint32_t next_timer() {
-    const uint64_t now = get_monotonic_usec();
+    const uint64_t now = get_monotonic_micro();
     uint64_t next = UINT64_MAX;
 
-    // Idle timers
+    // Check the idle timers
+    // If there are any idle connections, calculate the time until the next idle timeout
     if (!dlist_empty(&g_data.idle_conns)) {
         const Conn *conn = container_of(g_data.idle_conns.next, Conn, idle_list);
         next = conn->idle_start + k_idle_timeout_ms * 1000;
     }
-    // TTL timers
+    // Check the TTL timers
+    // If there are any entries in the heap, get the time of the earliest TTL event
     if (!vector_empty(g_data.heap) && ((HeapItem *) vector_back(g_data.heap))->val < next) {
         next = ((HeapItem *) vector_at(g_data.heap, 0))->val;
     }
+    // If there are no pending events, return a default value
     if (next == UINT64_MAX) return 10'000;
 
+    // Calculate the time until the next event
     if (next > now) return (next - now) / 1000;
     return 0;
 }
 
-static bool compare_hnode(const HNode *lhs, const HNode *rhs) {
+/**
+ * @brief Checks if two hash node pointers point to the same hash node.
+ * @param lhs the first hash node pointer.
+ * @param rhs the second hash node pointer.
+ * @return true if the two hash node pointers point to the same hash node, false otherwise.
+ */
+static inline bool compare_hnode(const HNode *lhs, const HNode *rhs) {
     return lhs == rhs;
 }
 
 static void conn_done(Conn *conn);
 
+/**
+ * @brief Processes the idle and TTL timers.
+ *
+ * This function checks both the idle timers and the TTL timers, and performs the necessary actions.
+ *
+ * For idle timers, it checks if there are any idle connections and if the idle timeout has been reached.
+ * If the idle timeout has been reached, it removes the connection.
+ *
+ * For TTL timers, it checks if there are any entries in the heap whose TTL has expired.
+ * If the TTL has expired, it removes the entry from the database.
+ *
+ * The function processes up to a maximum of 2000 expired TTLs per call.
+ */
 static void process_timers() {
-    const uint64_t now = get_monotonic_usec() + 1000;
+    const uint64_t now = get_monotonic_micro() + 1000;
     // Idle timers
     while (!dlist_empty(&g_data.idle_conns)) {
         Conn *conn = container_of(g_data.idle_conns.next, Conn, idle_list);
@@ -728,7 +828,7 @@ static void process_timers() {
         constexpr size_t k_max_works = 2000;
         Entry *ent = container_of(((HeapItem *) vector_at(g_data.heap, 0))->ref, Entry, heap_idx);
         const HNode *node = hm_pop(&g_data.db, &ent->node, &compare_hnode);
-        if(node != &ent->node){
+        if (node != &ent->node) {
             puts("node != &ent->node\n");
             return;
         }
@@ -740,6 +840,20 @@ static void process_timers() {
 
 static bool str2int(const string_c *str, int64_t *val);
 
+/**
+ * @brief Handles the "expire" command.
+ *
+ * This function is used to set a time-to-live (TTL) value for a key in the database.
+ * The TTL value is specified in milliseconds.
+ * If the key does not exist, the function returns without doing anything.\n
+ * If the key exists, the function sets the TTL value for the key.\n
+ * If the TTL value is successfully set, the function sends 1 as the response.
+ * Otherwise, it responds with 0.
+ *
+ * @param cmd Pointer to the command vector.
+ * The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_expire(const ptr_vector *cmd, string_c *out) {
     int64_t ttl_ms = 0;
     if (!str2int(ptr_vector_at(cmd, 2), &ttl_ms)) {
@@ -760,9 +874,22 @@ static void do_expire(const ptr_vector *cmd, string_c *out) {
         entry_set_ttl(ent, ttl_ms);
     }
     out_int(out, node ? 1 : 0);
-    entry_free(&key);
+    entry_free_key_value(&key);
 }
 
+/**
+ * @brief Handles the "ttl" command.
+ *
+ * This function is used to retrieve the time-to-live (TTL) value for a key in the database.\n
+ * The TTL value is sent in milliseconds.\n
+ * If the key does not exist, the function sends -2.\n
+ * If the key exists but does not have a TTL value, the function sends -1.\n
+ * If the key exists and has a TTL value, the function sends the TTL value.
+ *
+ * @param cmd Pointer to the command vector.
+ * The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_ttl(const ptr_vector *cmd, string_c *out) {
     Entry key;
     entry_init(&key);
@@ -772,19 +899,19 @@ static void do_ttl(const ptr_vector *cmd, string_c *out) {
     const HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
     if (node == nullptr) {
         out_int(out, -2);
-        entry_free(&key);
+        entry_free_key_value(&key);
         return;
     }
     const Entry *ent = container_of(node, Entry, node);
     if (ent->heap_idx == SIZE_MAX) {
         out_int(out, -1);
-        entry_free(&key);
+        entry_free_key_value(&key);
         return;
     }
     const uint64_t expire_at = ((HeapItem *) vector_at(g_data.heap, ent->heap_idx))->val;
-    const uint64_t now_us = get_monotonic_usec();
+    const uint64_t now_us = get_monotonic_micro();
     out_int(out, expire_at > now_us ? (int64_t) (expire_at - now_us) / 1000 : 0);
-    entry_free(&key);
+    entry_free_key_value(&key);
 }
 
 // Restore the warning about statement expressions in macros
@@ -794,11 +921,18 @@ static void do_ttl(const ptr_vector *cmd, string_c *out) {
 #pragma GCC diagnostic pop
 #endif
 
-// set or remove the TTL
+/**
+ * @brief Sets or removes the time-to-live (TTL) for an entry in the database.
+ *
+ * If the entry is not in the heap, it adds the entry to the heap.
+ *
+ * @param ent Pointer to the Entry structure for which the TTL value is to be set or removed.
+ * @param ttl_ms The TTL value in milliseconds.
+ * If this value is negative, the function removes the TTL for the entry.
+ */
 static void entry_set_ttl(Entry *ent, const int64_t ttl_ms) {
     if (ttl_ms < 0 && ent->heap_idx != SIZE_MAX) {
-        // erase an item from the heap
-        // by replacing it with the last item in the array.
+        // Erase the item from the heap
         const size_t pos = ent->heap_idx;
         vector_set(g_data.heap, pos, vector_back(g_data.heap));
         vector_pop_back(g_data.heap);
@@ -810,13 +944,14 @@ static void entry_set_ttl(Entry *ent, const int64_t ttl_ms) {
     } else if (ttl_ms >= 0) {
         size_t pos = ent->heap_idx;
         if (pos == SIZE_MAX) {
-            // add a new item to the heap
+            // Add the item to the heap
             HeapItem item;
             item.ref = &ent->heap_idx;
             vector_push_back(g_data.heap, &item);
             pos = vector_size(g_data.heap) - 1;
         }
-        ((HeapItem *) vector_at(g_data.heap, pos))->val = get_monotonic_usec() + (uint64_t) ttl_ms * 1000;
+        // Set the TTL
+        ((HeapItem *) vector_at(g_data.heap, pos))->val = get_monotonic_micro() + (uint64_t) ttl_ms * 1000;
         heap_update(vector_data(g_data.heap), pos, vector_size(g_data.heap));
     }
 }
@@ -826,7 +961,8 @@ static void entry_set_ttl(Entry *ent, const int64_t ttl_ms) {
  * @brief Scans a hash table and applies a function to each node.
  *
  * @param tab Pointer to the hash table to be scanned.
- * @param f Pointer to the function to be applied to each node. The function should take a pointer to a hash node and a pointer to an argument.
+ * @param f Pointer to the function to be applied to each node.
+ * The function should take a pointer to a hash node and a pointer to an argument.
  * @param arg Pointer to the argument to be passed to the function.
  */
 static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
@@ -856,18 +992,43 @@ static void do_keys(const ptr_vector *cmd [[maybe_unused]], string_c *out) {
     h_scan(&g_data.db.ht2,  &cb_scan, out);
 }
 
+/**
+ * @brief Converts a string to a double.
+ *
+ * @param str Pointer to the string to be converted.
+ * @param val Pointer to a double where the converted value will be stored.
+ * @return True if the conversion was successful and the entire string was consumed, false otherwise.
+ */
 static bool str2dbl(const string_c *str, double *val) {
     char *end = nullptr;
     *val = strtod(str->data, &end);
     return end == str->data + str->size && !isnan(*val);
 }
 
+/**
+ * @brief Converts a string to an integer.
+ *
+ * @param str Pointer to the string to be converted.
+ * @param val Pointer to an int64_t where the converted value will be stored.
+ * @return True if the conversion was successful and the entire string was consumed, false otherwise.
+ */
 static bool str2int(const string_c *str, int64_t *val) {
     char *end = nullptr;
     *val = strtoll(str->data, &end, 10);
     return end == str->data + str->size;
 }
 
+/**
+ * @brief Handles the "zrem" command.
+ *
+ * This function is used to remove a member from a sorted set in the database.\n
+ * If the key does not exist or is not associated with a sorted set, the function returns without doing anything.\n
+ * If the member does not exist in the sorted set, the function sends 0.\n
+ * If the member exists in the sorted set, the function removes the member and sends 1.
+ *
+ * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_zrem(const ptr_vector *cmd, string_c *out) {
     Entry *ent = nullptr;
     if (!expect_zset(out, ptr_vector_at(cmd, 1), &ent)) return;
@@ -879,6 +1040,18 @@ static void do_zrem(const ptr_vector *cmd, string_c *out) {
     out_int(out, znode ? 1 : 0);
 }
 
+/**
+ * @brief Handles the "zscore" command.
+ *
+ * This function is used to retrieve the score of a member in a sorted set in the database.\n
+ * If the key does not exist or is not associated with a sorted set, the function sends nil.\n
+ * If the member does not exist in the sorted set, the function sends nil.\n
+ * If the member exists in the sorted set, the function sends the score of the member.
+ *
+ * @param cmd Pointer to the command vector.
+ * The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_zscore(const ptr_vector *cmd, string_c *out) {
     Entry *ent = nullptr;
     if (!expect_zset(out, ptr_vector_at(cmd, 1), &ent)) return;
@@ -890,6 +1063,26 @@ static void do_zscore(const ptr_vector *cmd, string_c *out) {
     else out_nil(out);
 }
 
+/**
+ * @brief Handles the "zquery" command.
+ *
+ * This function is used to query a sorted set in the database based on a score and a name.\n
+ * It first parses the arguments from the command vector, which should include a score,
+ * a name, an offset, and a limit.\n
+ *
+ * If the parsing fails, it sends an error message to the client.\n
+ * If the parsing is successful, it retrieves the sorted set associated with the key from the database.\n
+ * If the key does not exist or is not associated with a sorted set, it sends an empty array to the client.\n
+ * If the key exists and is associated with a sorted set, it queries the sorted set based on the score and the name,
+ * and sends the results to the client.
+ *
+ * The results include the names and scores of the members in the sorted set.\n
+ * The number of results is limited by the limit argument, and the results are offset by the offset argument.
+ *
+ * @param cmd Pointer to the command vector.
+ * The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_zquery(const ptr_vector *cmd, string_c *out) {
     // Parse args
     double score = 0;
@@ -944,17 +1137,32 @@ static void do_zquery(const ptr_vector *cmd, string_c *out) {
     end_arr(out, ctx, n);
 }
 
+/**
+ * @brief Checks if a key exists in the database.
+ *
+ * @param key Pointer to the string containing the key to be checked.
+ * @return 1 if the key exists in the database, 0 otherwise.
+ */
 static unsigned int exists(string_c *key) {
     Entry ent;
     entry_init(&ent);
     string_swap(ent.key, key);
     ent.node.hcode = fnv1a_hash((uint8_t *) ent.key->data, string_length(ent.key));
-
     const HNode *node = hm_lookup(&g_data.db, &ent.node, &entry_eq);
-    entry_free(&ent);
+    entry_free_key_value(&ent);
     return node ? 1 : 0;
 }
 
+/**
+ * @brief Handles the "exists" command.
+ *
+ * This function is used to check if one or more keys exist in the database.\n
+ * Duplicate queries are ignored.
+ *
+ * @param cmd Pointer to the command vector.
+ * The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_exists(const ptr_vector *cmd, string_c *out) {
     // Remove duplicate queries
     ptr_vector *tmp = ptr_vector_new();
@@ -978,6 +1186,17 @@ static void do_exists(const ptr_vector *cmd, string_c *out) {
     out_int(out, n);
 }
 
+/**
+ * @brief Handles the "command" command.
+ *
+ * This function is used to provide information about the available commands in the database.
+ * If the second argument in the command vector is "list", the commands are listed instead of
+ * their verbose descriptions.
+ *
+ * @param cmd Pointer to the command vector.
+ * The command vector contains the command and its arguments.
+ * @param out Pointer to the string where the response will be stored.
+ */
 static void do_command(const ptr_vector *cmd, string_c *out) {
     string_c *tmp = string_new();
     if (ptr_vector_size(cmd) >= 2) {
@@ -1237,7 +1456,7 @@ static void state_res(Conn *conn) {
  * @param conn Pointer to the connection structure.
  */
 static void connection_io(Conn *conn) {
-    conn->idle_start = get_monotonic_usec();
+    conn->idle_start = get_monotonic_micro();
     dlist_detach(&conn->idle_list);
     dlist_insert_before(&g_data.idle_conns, &conn->idle_list);
 
@@ -1250,15 +1469,24 @@ static void connection_io(Conn *conn) {
     }
 }
 
+/**
+ * @brief Finalizes a connection.
+ *
+ * This function is used to clean up a connection when it is no longer needed.
+ *
+ * @param conn Pointer to the connection structure to be finalized.
+ */
 static void conn_done(Conn *conn) {
-    // ptr_vector_free(g_data.fd2conn);
     ptr_vector_set(g_data.fd2conn, conn->fd, nullptr);
     close(conn->fd);
     dlist_detach(&conn->idle_list);
     free(conn);
 }
 
-static __inline void init_g_data() {
+/**
+ * @brief Initializes the global data structure.
+ */
+static void init_g_data() {
     init_hmap(&g_data.db);
     g_data.fd2conn = ptr_vector_new();
     dlist_init(&g_data.idle_conns);
@@ -1266,6 +1494,11 @@ static __inline void init_g_data() {
     thread_pool_init(&g_data.pool, 4);
 }
 
+/**
+ * @brief Frees the global data structure.
+ *
+ * This function is used to free the global data structure at the end of the program.
+ */
 void free_g_data() {
     ptr_vector_free(g_data.fd2conn);
     vector_free(g_data.heap);
@@ -1323,7 +1556,7 @@ int main() {
             pfd2.fd = conn->fd;
             // Set the events based on the connection state
             pfd2.events = conn->state == STATE_REQ ? POLLIN : POLLOUT;
-            pfd2.events = (short) ( pfd2.events | POLLERR);
+            pfd2.events = (short) (pfd2.events | POLLERR);
             vector_push_back(poll_args, &pfd2);
         }
         // Poll for events
@@ -1344,7 +1577,7 @@ int main() {
                 }
             }
         }
-        // handle timers
+        // Handle timers
         process_timers();
 
         // Accept new connections
