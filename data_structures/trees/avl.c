@@ -1,23 +1,55 @@
+#include <stddef.h>
 #include "avl.h"
 
+/**
+ * @brief Calculate the height of an AVL tree node.
+ *
+ * @param node A pointer to the AVLNode for which the height is to be calculated.
+ * @return The height of the node. If the node is NULL, returns 0.
+ */
 uint32_t avl_height(const AVLNode *node) {
     return node ? node->height : 0;
 }
 
+/**
+ * @brief Calculate the count of an AVL tree node.
+ *
+ * @param node A pointer to the AVLNode for which the count is to be calculated.
+ * @return The count of the node. If the node is NULL, returns 0.
+ */
 uint32_t avl_count(const AVLNode *node) {
     return node ? node->count : 0;
 }
 
-static uint32_t max(const uint32_t lhs, const uint32_t rhs) {
-    return lhs < rhs ? rhs : lhs;
+/**
+ * @brief Returns the maximum of two unsigned integers.
+ *
+ * @param x, y unsigned integers.
+ * @return The maximum of \p x and \p y.
+ *
+ * @note This function uses bitwise operations to calculate the maximum of two unsigned integers.\n
+ * It does not use conditional statements, which makes it faster in some cases.
+ */
+static inline size_t max(const size_t x, const size_t y) {
+    return x ^ ((x ^ y) & -(x < y));
 }
 
-// maintaining the height and cnt field
+/**
+ * @brief Update the height and count of an AVL tree node.
+ *
+ * @param node A pointer to the AVLNode which needs to be updated.
+ */
 void avl_update(AVLNode *node) {
     node->height = 1 + max(avl_height(node->left), avl_height(node->right));
     node->count = 1 + avl_count(node->left) + avl_count(node->right);
 }
 
+/**
+ * @brief Perform a left rotation on an AVL tree node.
+ *
+ * @param node A pointer to the AVLNode on which the rotation is to be performed.
+ * @return A pointer to the new root after the rotation.
+ */
 AVLNode *rot_left(AVLNode *node) {
     AVLNode *new_node = node->right;
     if (new_node->left) {
@@ -27,11 +59,18 @@ AVLNode *rot_left(AVLNode *node) {
     new_node->left = node;
     new_node->parent = node->parent;
     node->parent = new_node;
+
     avl_update(node);
     avl_update(new_node);
     return new_node;
 }
 
+/**
+ * @brief Perform a right rotation on an AVL tree node.
+ *
+ * @param node A pointer to the AVLNode on which the rotation is to be performed.
+ * @return A pointer to the new root after the rotation.
+ */
 AVLNode *rot_right(AVLNode *node) {
     AVLNode *new_node = node->left;
     if (new_node->right) {
@@ -41,12 +80,18 @@ AVLNode *rot_right(AVLNode *node) {
     new_node->right = node;
     new_node->parent = node->parent;
     node->parent = new_node;
+
     avl_update(node);
     avl_update(new_node);
     return new_node;
 }
 
-// the left subtree is too deep
+/**
+ * @brief Fix an AVL tree node when the left subtree is too deep.
+ *
+ * @param root A pointer to the AVLNode that needs to be fixed.
+ * @return A pointer to the new root after the rotations.
+ */
 AVLNode *avl_fix_left(AVLNode *root) {
     if (avl_height(root->left->left) < avl_height(root->left->right)) {
         root->left = rot_left(root->left);
@@ -54,7 +99,12 @@ AVLNode *avl_fix_left(AVLNode *root) {
     return rot_right(root);
 }
 
-// the right subtree is too deep
+/**
+ * @brief Fix an AVL tree node when the right subtree is too deep.
+ *
+ * @param root A pointer to the AVLNode that needs to be fixed.
+ * @return A pointer to the new root after the rotations.
+ */
 AVLNode *avl_fix_right(AVLNode *root) {
     if (avl_height(root->right->right) < avl_height(root->right->left)) {
         root->right = rot_right(root->right);
@@ -62,7 +112,12 @@ AVLNode *avl_fix_right(AVLNode *root) {
     return rot_left(root);
 }
 
-// fix imbalanced nodes and maintain invariants until the root is reached
+/**
+ * @brief Fix imbalanced AVL tree nodes and maintain invariants until the root is reached.
+ *
+ * @param node A pointer to the AVLNode from where the fixing process starts.
+ * @return A pointer to the root of the tree after all the necessary rotations have been performed.
+ */
 AVLNode *avl_fix(AVLNode *node) {
     while (true) {
         avl_update(node);
@@ -83,26 +138,31 @@ AVLNode *avl_fix(AVLNode *node) {
     }
 }
 
-// detach a node and returns the new root of the tree
+/**
+ * @brief Detach a node and return the new root of the tree.
+ *
+ * @param node A pointer to the AVLNode to be deleted.
+ * @return A pointer to the new root of the tree after the deletion and necessary rotations.
+ */
 AVLNode *avl_del(const AVLNode *node) {
     if (node->right == nullptr) {
-        // no right subtree, replace the node with the left subtree
-        // link the left subtree to the parent
+        // No right subtree, replace the node with the left subtree.
+        // Link the left subtree to the parent
         AVLNode *parent = node->parent;
-        if (node->left) {
+        if (node->left)
             node->left->parent = parent;
-        }
+
         if (parent) {
-            // attach the left subtree to the parent
+            // Attach the left subtree to the parent
             if (parent->left == node) parent->left = node->left;
             else parent->right = node->left;
             return avl_fix(parent);
         } else {
-            // removing root?
+            // Removing the root?
             return node->left;
         }
     } else {
-        // swap the node with its next sibling
+        // Swap the node with its next sibling
         AVLNode *victim = node->right;
         while (victim->left) {
             victim = victim->left;
@@ -110,38 +170,45 @@ AVLNode *avl_del(const AVLNode *node) {
         AVLNode *root = avl_del(victim);
 
         *victim = *node;
-        if (victim->left) {
+        if (victim->left)
             victim->left->parent = victim;
-        }
-        if (victim->right) {
+
+        if (victim->right)
             victim->right->parent = victim;
-        }
+
         AVLNode *parent = node->parent;
         if (parent) {
             if (parent->left == node) parent->left = victim;
             else parent->right = victim;
             return root;
         } else {
-            // removing root?
+            // Removing the root?
             return victim;
         }
     }
 }
 
-// offset into the succeeding or preceding node.
+/**
+ * @brief Offset into the succeeding or preceding node.
+ *
+ * @param node A pointer to the AVLNode from where the offset is calculated.
+ * @param offset The offset to the target node. Can be positive or negative.
+ * @return A pointer to the target node if it exists, or nullptr if the offset is out of range.
+ */
 AVLNode *avl_offset(AVLNode *node, const int64_t offset) {
-    int64_t pos = 0; // relative to the starting node
+    // Position relative to the starting node
+    int64_t pos = 0;
     while (offset != pos) {
         if (pos < offset && pos + avl_count(node->right) >= offset) {
-            // the target is inside the right subtree
+            // The target is inside the right subtree
             node = node->right;
             pos += avl_count(node->left) + 1;
         } else if (pos > offset && pos - avl_count(node->left) <= offset) {
-            // the target is inside the left subtree
+            // The target is inside the left subtree
             node = node->left;
             pos -= avl_count(node->right) + 1;
         } else {
-            // go to the parent
+            // Go to the parent
             AVLNode *parent = node->parent;
             if (parent == nullptr) {
                 return nullptr;
