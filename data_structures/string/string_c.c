@@ -43,8 +43,13 @@ void string_free(string_c *const restrict s) {
     }
 }
 
-// Round up x to the next power of 2
-__attribute_pure__ static size_t clp2(unsigned x) {
+/**
+ * @brief Computes the smallest power of 2 greater than or equal to the input integer.
+ *
+ * @param x The input integer.
+ * @return The smallest power of 2 greater than or equal to the input integer.
+ */
+__attribute_pure__ static size_t clp2(size_t x) {
     --x;
     x |= x >> 1;
     x |= x >> 2;

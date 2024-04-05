@@ -14,8 +14,8 @@ extern "C" {
  * When the size reaches the capacity, the string is resized to a larger capacity to accommodate more characters.
  */
 struct string_c {
-    char *data; ///< A pointer to the character data.
-    size_t size; ///< The number of characters in the string, not including the null character.
+    char *data;      ///< A pointer to the character data.
+    size_t size;     ///< The number of characters in the string, not including the null character.
     size_t capacity; ///< The total number of characters that the string can hold.
 };
 
@@ -128,5 +128,5 @@ bool string_shrink(string_c *restrict s, size_t size);
 bool string_shrink_to_fit(string_c *restrict s);
 
 #if __cplusplus
-    }
+}
 #endif
