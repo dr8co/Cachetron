@@ -27,7 +27,7 @@ enum : size_t {
  *
  * @param msg The error message to be reported.
  */
-static void report_error(const char *msg) {
+static inline void report_error(const char *msg) {
     perror(msg);
 }
 
@@ -36,7 +36,7 @@ static void report_error(const char *msg) {
  *
  * @param msg The error message to be displayed.
  */
-static void die(const char *msg) {
+static inline void die(const char *msg) {
     report_error(msg);
     exit(1);
 }
@@ -52,9 +52,7 @@ static void die(const char *msg) {
 static int32_t read_full(const int fd, char *buf, size_t n) {
     while (n > 0) {
         const ssize_t rv = read(fd, buf, n);
-
         if (rv <= 0) return -1; // error, or unexpected EOF
-
         assert((size_t) rv <= n);
         n -= (size_t) rv;
         buf += rv;
@@ -73,9 +71,7 @@ static int32_t read_full(const int fd, char *buf, size_t n) {
 static int32_t write_all(const int fd, const char *buf, size_t n) {
     while (n > 0) {
         const ssize_t rv = write(fd, buf, n);
-
         if (rv <= 0) return -1; // error
-
         assert((size_t) rv <= n);
         n -= (size_t) rv;
         buf += rv;
@@ -104,9 +100,9 @@ static int32_t send_req(const int fd, const ptr_vector *cmd) {
     uint32_t len = 4;
 
     // Calculate the length of the message
-    for (size_t i = 0; i < ptr_vector_size(cmd); ++i) {
+    for (size_t i = 0; i < ptr_vector_size(cmd); ++i)
         len += 4 + string_length(ptr_vector_at(cmd, i));
-    }
+
     // Check if the message is too long
     if (len > k_max_msg) return -1;
 
@@ -125,23 +121,37 @@ static int32_t send_req(const int fd, const ptr_vector *cmd) {
 
         memcpy(&wbuf[cur], &p, 4);
         memcpy(&wbuf[cur + 4], strbuf, p);
-
         cur += 4 + p;
     }
-
     return write_all(fd, wbuf, 4 + len);
 }
 
-static int32_t on_response(const uint8_t *data, const size_t size) {
+/**
+ * @brief Processes the response received from the server.
+ *
+ * This function takes a pointer to the data received and its size,
+ * and processes it based on the type of the response.
+ *
+ * The response type is determined by the first byte of the data.
+ *
+ * @param data A pointer to the data received from the server.
+ * @param size The size of the data received from the server.
+ * @return The number of bytes processed on success, or -1 on failure.
+ */
+static int32_t process_response(const uint8_t *data, const size_t size) {
+    // The response must contain at least one byte
     if (size < 1) {
         report_error("bad response");
         return -1;
     }
+    // Process the data based on its type
     switch (data[0]) {
-        case SER_NIL:
+        case SER_NIL: // Nil response
             printf("(nil)\n");
             return 1;
-        case SER_ERR:
+        case SER_ERR: // Error response
+            // Check if the response is long enough to contain the error code.
+            // 1 byte for the type, 4 bytes for the code, and 4 bytes for the length of the error message.
             if (size < 1 + 8) {
                 report_error("bad response");
                 return -1;
@@ -150,6 +160,7 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 uint32_t len = 0;
                 memcpy(&code, &data[1], 4);
                 memcpy(&len, &data[1 + 4], 4);
+
                 if (size < 1 + 8 + len) {
                     report_error("bad response");
                     return -1;
@@ -158,7 +169,9 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 return 1 + 8 + len;
             }
 
-        case SER_STR:
+        case SER_STR: // String response
+            // Check if the response is long enough to contain the length of the string.
+            // 1 byte for the type, 4 bytes for the length of the string.
             if (size < 1 + 4) {
                 report_error("bad response");
                 return -1;
@@ -172,7 +185,9 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 printf("(str) %.*s\n", len, (char *) &data[1 + 4]);
                 return 1 + 4 + len;
             }
-        case SER_INT:
+        case SER_INT: // Integer response
+            // Check if the response is long enough to contain the integer value.
+            // 1 byte for the type, 8 bytes for the integer value.
             if (size < 1 + 8) {
                 report_error("bad response");
                 return -1;
@@ -182,7 +197,9 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 printf("(int) %ld\n", val);
                 return 1 + 8;
             }
-        case SER_DBL:
+        case SER_DBL: // Double response
+            // Check if the response is long enough to contain the double value.
+            // 1 byte for the type, 8 bytes for the double value.
             if (size < 1 + 8) {
                 report_error("bad response");
                 return -1;
@@ -192,7 +209,9 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 printf("(dbl) %g\n", val);
                 return 1 + 8;
             }
-        case SER_ARR:
+        case SER_ARR: // Array response
+            // Check if the response is long enough to contain the length of the array.
+            // 1 byte for the type, 4 bytes for the length of the array.
             if (size < 1 + 4) {
                 report_error("bad response");
                 return -1;
@@ -201,8 +220,9 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 memcpy(&len, &data[1], 4);
                 printf("(arr) len=%u\n", len);
                 size_t arr_bytes = 1 + 4;
+                // Process each element in the array
                 for (uint32_t i = 0; i < len; ++i) {
-                    const int32_t rv = on_response(&data[arr_bytes], size - arr_bytes);
+                    const int32_t rv = process_response(&data[arr_bytes], size - arr_bytes);
                     if (rv < 0) {
                         return rv;
                     }
@@ -212,6 +232,7 @@ static int32_t on_response(const uint8_t *data, const size_t size) {
                 return arr_bytes;
             }
         default:
+            // If the type of the data is not recognized, report an error
             report_error("bad response");
             return -1;
     }
@@ -248,7 +269,7 @@ static int32_t read_res(const int fd) {
         return err;
     }
     // print the result
-    int32_t rv = on_response((uint8_t *) &rbuf[4], len);
+    int32_t rv = process_response((uint8_t *) &rbuf[4], len);
     if (rv > 0 && (uint32_t) rv != len) {
         report_error("bad response");
         rv = -1;
@@ -261,7 +282,6 @@ int main(const int argc, char **argv) {
         fprintf(stderr, "Usage: %s <command> [args...]\n", argv[0]);
         return 1;
     }
-
     // Create a socket
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) die("socket() failure");
