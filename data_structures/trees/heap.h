@@ -13,7 +13,7 @@ extern "C" {
  */
 struct HeapItem {
     uint64_t val;  ///< The value of the heap item.
-    size_t *ref;   ///< A pointer to the position of the heap item in the heap array.
+    size_t *ref;   ///< A pointer to the position of the item in the heap array.
 };
 
 typedef struct HeapItem HeapItem;

@@ -43,6 +43,7 @@ static void heap_down(HeapItem *item, size_t pos, const size_t len) {
         const size_t r = heap_right(pos);
         size_t min_pos = -1;
         size_t min_val = t.val;
+
         if (l < len && item[l].val < min_val) {
             min_pos = l;
             min_val = item[l].val;
