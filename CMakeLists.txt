@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.27)
 project(Cachetron C CXX)
 
 set(CMAKE_C_STANDARD 23)
@@ -40,33 +40,25 @@ endif ()
 # Tests
 add_subdirectory(tests)
 
+# Data structures
+file(GLOB_RECURSE DS_SOURCES
+        data_structures/*.c
+        data_structures/*.h)
+
+# server executable
 add_executable(server
         server.c
         common.h
         thread_pool.c
         thread_pool.h
         commands.h
-        data_structures/trees/avl.c
-        data_structures/trees/avl.h
-        data_structures/vector/vector_c.c
-        data_structures/vector/vector_c.h
-        data_structures/string/string_c.c
-        data_structures/string/string_c.h
-        data_structures/hashmap/hashtable.c
-        data_structures/hashmap/hashtable.h
-        data_structures/set/zset.c
-        data_structures/set/zset.h
-        data_structures/list/list.c
-        data_structures/list/list.h
-        data_structures/trees/heap.c
-        data_structures/trees/heap.h
-        data_structures/queue/deque_c.c
-        data_structures/queue/deque_c.h)
+        ${DS_SOURCES})
 
+# client executable
 add_executable(client
         client.c
+        common.h
         data_structures/vector/vector_c.c
         data_structures/vector/vector_c.h
         data_structures/string/string_c.c
-        data_structures/string/string_c.h
-        common.h)
+        data_structures/string/string_c.h)
