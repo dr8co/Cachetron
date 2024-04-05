@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "cachetron"
+name = "Cachetron"
 version = "0.1.0"
-description = ""
+description = "A simple in-memory data structure store"
 authors = ["Ian Duncan <dr8co@duck.com>"]
 readme = "README.md"
 
