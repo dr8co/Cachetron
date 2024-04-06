@@ -37,6 +37,5 @@ jobs:
       run: |
         sed -i 's/3.11/3.10/' ./pyproject.toml
         poetry install
-        poetry shell
-        ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
+        poetry run ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
 
