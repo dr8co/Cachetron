@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main", "dev" ]
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main" ]
 
 env:
   BUILD_TYPE: Debug
@@ -14,10 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install Ninja
-      run: sudo apt update && sudo apt install ninja-build
+    - name: Install Ninja and Python 3.12
+      run: sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt update \
+           && sudo apt install ninja-build python3.12
       
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
