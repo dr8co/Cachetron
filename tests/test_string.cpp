@@ -1,8 +1,7 @@
-#include <assert.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-
+#include <cassert>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include "../data_structures/string/string_c.h"
 
 void string_new_creates_empty_string() {
