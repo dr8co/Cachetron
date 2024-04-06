@@ -75,8 +75,8 @@ add_executable(client
         common.h
         data_structures/vector/vector_c.c
         data_structures/vector/vector_c.h
-        data_structures/string/string_c.c
-        data_structures/string/string_c.h)
+        data_structures/string/lite_string.c
+        data_structures/string/lite_string.h)
 
 # Tests
 add_subdirectory(tests)

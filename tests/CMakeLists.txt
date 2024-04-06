@@ -6,8 +6,8 @@ add_executable(test_vector
 
 add_executable(test_string
         test_string.cpp
-        ../data_structures/string/string_c.c
-        ../data_structures/string/string_c.h)
+        ../data_structures/string/lite_string.c
+        ../data_structures/string/lite_string.h)
 
 add_executable(test_deque
         test_deque.cpp

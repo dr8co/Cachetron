@@ -11,7 +11,7 @@
 #include <math.h>
 #include <time.h>
 
-#include "data_structures/string/string_c.h"
+#include "data_structures/string/lite_string.h"
 #include "data_structures/vector/vector_c.h"
 #include "data_structures/hashmap/hashtable.h"
 #include "data_structures/set/zset.h"
@@ -266,8 +266,8 @@ enum {
  */
 struct Entry {
     HNode node;      ///< The node used by the hash map. It is used to link the entries in the hash map.
-    string_c *key;   ///< The key of the hash map entry. It identifies the entry in the hash map.
-    string_c *value; ///< The value of the hash map entry. It is the data associated with the key.
+    lite_string *key;   ///< The key of the hash map entry. It identifies the entry in the hash map.
+    lite_string *value; ///< The value of the hash map entry. It is the data associated with the key.
     uint32_t type;   ///< The type of the value. It is used to determine how to interpret the value.
     ZSet *zset;      ///< The sorted set associated with the entry.
     size_t heap_idx; ///< The index of the entry in the heap.
@@ -339,7 +339,7 @@ enum {
  *
  * @note This function is similar to \p string_append_cstr_range(), but it also works with binary data.
  */
-static bool string_append_cstr_range_bin(string_c *const restrict s, const char *const restrict cstr,
+static bool string_append_cstr_range_bin(lite_string *const restrict s, const char *const restrict cstr,
                                          const size_t count) {
     if (s) {
         if (count == 0) return true;
@@ -365,7 +365,7 @@ static bool string_append_cstr_range_bin(string_c *const restrict s, const char 
  *
  * @note This function is similar to \p string_push_back(), but it also works with binary data.
  */
-static bool string_push_back_bin(string_c *const restrict s, const char c) {
+static bool string_push_back_bin(lite_string *const restrict s, const char c) {
     if (s) {
         if (s->size == s->capacity) {
             if (!string_reserve(s, s->capacity * 2)) return false;
@@ -381,7 +381,7 @@ static bool string_push_back_bin(string_c *const restrict s, const char c) {
  *
  * @param out Pointer to the output string.
  */
-static void out_nil(string_c *out) {
+static void out_nil(lite_string *out) {
     string_push_back_bin(out, SER_NIL);
 }
 
@@ -392,7 +392,7 @@ static void out_nil(string_c *out) {
  * @param val Pointer to the string value to be appended.
  * @param size The size of the string value.
  */
-static void out_str(string_c *out, const string_c *val, const size_t size) {
+static void out_str(lite_string *out, const lite_string *val, const size_t size) {
     string_push_back_bin(out, SER_STR);
     uint32_t len = size;
     string_append_cstr_range_bin(out, (char *) &len, 4);
@@ -406,7 +406,7 @@ static void out_str(string_c *out, const string_c *val, const size_t size) {
  * @param out Pointer to the output string.
  * @param val The integer value to be appended.
  */
-static void out_int(string_c *out, int64_t val) {
+static void out_int(lite_string *out, int64_t val) {
     string_push_back_bin(out, SER_INT);
     string_append_cstr_range_bin(out, (char *) &val, 8);
 }
@@ -416,7 +416,7 @@ static void out_int(string_c *out, int64_t val) {
  * @param out Pointer to the output string.
  * @param val The double value to be appended.
  */
-static void out_dbl(string_c *out, double val) {
+static void out_dbl(lite_string *out, double val) {
     string_push_back_bin(out, SER_DBL);
     string_append_cstr_range_bin(out, (char *) &val, 8);
 }
@@ -428,7 +428,7 @@ static void out_dbl(string_c *out, double val) {
  * @param code The error code.
  * @param msg The error message. Should be a null-terminated string.
  */
-static void out_err(string_c *out, int32_t code, const char *msg) {
+static void out_err(lite_string *out, int32_t code, const char *msg) {
     string_push_back_bin(out, SER_ERR);
     string_append_cstr_range_bin(out, (char *) &code, 4);
 
@@ -444,7 +444,7 @@ static void out_err(string_c *out, int32_t code, const char *msg) {
  * @param out Pointer to the output string.
  * @param n The number of elements in the array.
  */
-static void out_arr(string_c *out, uint32_t n) {
+static void out_arr(lite_string *out, uint32_t n) {
     string_push_back_bin(out, SER_ARR);
     string_append_cstr_range_bin(out, (char *) &n, 4);
 }
@@ -455,7 +455,7 @@ static void out_arr(string_c *out, uint32_t n) {
  * @param out Pointer to the output string.
  * @return Pointer to the position in the output string where the array length should be written.
  */
-static void *begin_arr(string_c *out) {
+static void *begin_arr(lite_string *out) {
     string_push_back_bin(out, SER_ARR);
     string_append_cstr_range_bin(out, "\0\0\0\0", 4);
     return (void *) (string_length(out) - 4);
@@ -468,7 +468,7 @@ static void *begin_arr(string_c *out) {
  * @param ctx Pointer to the position in the output string where the array length should be written.
  * @param n The length of the array.
  */
-static void end_arr(const string_c *out, void *ctx, const uint32_t n) {
+static void end_arr(const lite_string *out, void *ctx, const uint32_t n) {
     const size_t pos = (size_t) ctx;
     assert(out->data[pos - 1] == SER_ARR);
     memcpy(&out->data[pos], &n, 4);
@@ -483,7 +483,7 @@ static void end_arr(const string_c *out, void *ctx, const uint32_t n) {
  * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_get(const ptr_vector *cmd, string_c *out) {
+static void do_get(const ptr_vector *cmd, lite_string *out) {
     // Create a new Entry structure and initialize it
     Entry key;
     entry_init(&key);
@@ -516,7 +516,7 @@ static void do_get(const ptr_vector *cmd, string_c *out) {
  * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_set(const ptr_vector *cmd, string_c *out) {
+static void do_set(const ptr_vector *cmd, lite_string *out) {
     // Create a new Entry structure and initialize it
     Entry key;
     entry_init(&key);
@@ -604,7 +604,7 @@ static void entry_del(Entry *ent) {
  * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_del(const ptr_vector *cmd, string_c *out) {
+static void do_del(const ptr_vector *cmd, lite_string *out) {
     // Create a new Entry structure and initialize it
     Entry key;
     entry_init(&key);
@@ -629,12 +629,12 @@ static void do_del(const ptr_vector *cmd, string_c *out) {
  * @param arg Pointer to the argument to be passed to the function.
  */
 static void cb_scan(HNode *node, void *arg) {
-    string_c *out = arg;
-    const string_c *tmp = container_of(node, Entry, node)->key;
+    lite_string *out = arg;
+    const lite_string *tmp = container_of(node, Entry, node)->key;
     out_str(out, tmp, string_length(tmp));
 }
 
-static bool str2dbl(const string_c *str, double *val);
+static bool str2dbl(const lite_string *str, double *val);
 
 /**
  * @brief Handles the "zadd" command.
@@ -648,7 +648,7 @@ static bool str2dbl(const string_c *str, double *val);
  * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_zadd(const ptr_vector *cmd, string_c *out) {
+static void do_zadd(const ptr_vector *cmd, lite_string *out) {
     // Parse the score from the command arguments
     double score = 0;
     if (!str2dbl(ptr_vector_at(cmd, 2), &score)) {
@@ -699,7 +699,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
         }
     }
     // Add the member to the ZSet with the specified score
-    const string_c *tmp = ptr_vector_at(cmd, 3);
+    const lite_string *tmp = ptr_vector_at(cmd, 3);
     const bool res = zset_add(ent->zset, tmp->data, string_length(tmp), score);
     out_int(out, res);
     entry_free_key_value(&key);
@@ -719,7 +719,7 @@ static void do_zadd(const ptr_vector *cmd, string_c *out) {
  * 'ent' is set to point to the Entry structure corresponding to the key.
  * @return True if the key corresponds to a ZSET, false otherwise.
  */
-static bool expect_zset(string_c *out, string_c *s, Entry **ent) {
+static bool expect_zset(lite_string *out, lite_string *s, Entry **ent) {
     Entry key;
     entry_init(&key);
     string_swap(key.key, s);
@@ -826,7 +826,7 @@ static void process_timers() {
     }
 }
 
-static bool str2int(const string_c *str, int64_t *val);
+static bool str2int(const lite_string *str, int64_t *val);
 
 /**
  * @brief Handles the "expire" command.
@@ -842,7 +842,7 @@ static bool str2int(const string_c *str, int64_t *val);
  * The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_expire(const ptr_vector *cmd, string_c *out) {
+static void do_expire(const ptr_vector *cmd, lite_string *out) {
     int64_t ttl_ms = 0;
     if (!str2int(ptr_vector_at(cmd, 2), &ttl_ms)) {
         out_err(out, ERR_ARG, "expect int64 type");
@@ -875,7 +875,7 @@ static void do_expire(const ptr_vector *cmd, string_c *out) {
  * The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_ttl(const ptr_vector *cmd, string_c *out) {
+static void do_ttl(const ptr_vector *cmd, lite_string *out) {
     Entry key;
     entry_init(&key);
     string_swap(key.key, ptr_vector_at(cmd, 1));
@@ -971,7 +971,7 @@ static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
  * This parameter is not used in this function.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_keys(const ptr_vector *cmd [[maybe_unused]], string_c *out) {
+static void do_keys(const ptr_vector *cmd [[maybe_unused]], lite_string *out) {
     out_arr(out, hm_size(&g_data.db));
     h_scan(&g_data.db.ht1,  &cb_scan, out);
     h_scan(&g_data.db.ht2,  &cb_scan, out);
@@ -984,7 +984,7 @@ static void do_keys(const ptr_vector *cmd [[maybe_unused]], string_c *out) {
  * @param val Pointer to a double where the converted value will be stored.
  * @return True if the conversion was successful and the entire string was consumed, false otherwise.
  */
-static bool str2dbl(const string_c *str, double *val) {
+static bool str2dbl(const lite_string *str, double *val) {
     char *end = nullptr;
     *val = strtod(str->data, &end);
     return end == str->data + str->size && !isnan(*val);
@@ -997,7 +997,7 @@ static bool str2dbl(const string_c *str, double *val) {
  * @param val Pointer to an int64_t where the converted value will be stored.
  * @return True if the conversion was successful and the entire string was consumed, false otherwise.
  */
-static bool str2int(const string_c *str, int64_t *val) {
+static bool str2int(const lite_string *str, int64_t *val) {
     char *end = nullptr;
     *val = strtoll(str->data, &end, 10);
     return end == str->data + str->size;
@@ -1014,11 +1014,11 @@ static bool str2int(const string_c *str, int64_t *val) {
  * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_zrem(const ptr_vector *cmd, string_c *out) {
+static void do_zrem(const ptr_vector *cmd, lite_string *out) {
     Entry *ent = nullptr;
     if (!expect_zset(out, ptr_vector_at(cmd, 1), &ent)) return;
 
-    const string_c *name = ptr_vector_at(cmd, 2);
+    const lite_string *name = ptr_vector_at(cmd, 2);
     ZNode *znode = zset_pop(ent->zset, name->data, string_length(name));
     if (znode) znode_del(znode);
 
@@ -1037,11 +1037,11 @@ static void do_zrem(const ptr_vector *cmd, string_c *out) {
  * The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_zscore(const ptr_vector *cmd, string_c *out) {
+static void do_zscore(const ptr_vector *cmd, lite_string *out) {
     Entry *ent = nullptr;
     if (!expect_zset(out, ptr_vector_at(cmd, 1), &ent)) return;
 
-    const string_c *name = ptr_vector_at(cmd, 2);
+    const lite_string *name = ptr_vector_at(cmd, 2);
     const ZNode *znode = zset_lookup(ent->zset, name->data, string_length(name));
 
     if (znode) out_dbl(out, znode->score);
@@ -1068,14 +1068,14 @@ static void do_zscore(const ptr_vector *cmd, string_c *out) {
  * The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_zquery(const ptr_vector *cmd, string_c *out) {
+static void do_zquery(const ptr_vector *cmd, lite_string *out) {
     // Parse args
     double score = 0;
     if (!str2dbl(ptr_vector_at(cmd, 2), &score)) {
         out_err(out, ERR_ARG, "invalid score");
         return;
     }
-    const string_c *name = ptr_vector_at(cmd, 3);
+    const lite_string *name = ptr_vector_at(cmd, 3);
     int64_t offset = 0, limit = 0;
     if (!str2int(ptr_vector_at(cmd, 4), &offset) || !str2int(ptr_vector_at(cmd, 5), &limit)) {
         out_err(out, ERR_ARG, "invalid offset or limit");
@@ -1101,7 +1101,7 @@ static void do_zquery(const ptr_vector *cmd, string_c *out) {
     // Output
     void *ctx = begin_arr(out);
     uint32_t n = 0;
-    string_c *tmp = string_new();
+    lite_string *tmp = string_new();
 
     while (znode && (int64_t) n < limit) {
         string_clear(tmp);
@@ -1122,7 +1122,7 @@ static void do_zquery(const ptr_vector *cmd, string_c *out) {
  * @param key Pointer to the string containing the key to be checked.
  * @return 1 if the key exists in the database, 0 otherwise.
  */
-static unsigned int exists(string_c *key) {
+static unsigned int exists(lite_string *key) {
     Entry ent;
     entry_init(&ent);
     string_swap(ent.key, key);
@@ -1144,7 +1144,7 @@ static unsigned int exists(string_c *key) {
  * The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_exists(const ptr_vector *cmd, string_c *out) {
+static void do_exists(const ptr_vector *cmd, lite_string *out) {
     // Remove duplicate queries
     ptr_vector *tmp = ptr_vector_new();
     for (size_t i = 1; i < ptr_vector_size(cmd); ++i) {
@@ -1178,8 +1178,8 @@ static void do_exists(const ptr_vector *cmd, string_c *out) {
  * The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_command(const ptr_vector *cmd, string_c *out) {
-    string_c *tmp = string_new();
+static void do_command(const ptr_vector *cmd, lite_string *out) {
+    lite_string *tmp = string_new();
     if (ptr_vector_size(cmd) >= 2) {
         if (string_case_compare_cstr(ptr_vector_at(cmd, 1), "list"))
             string_append_cstr(tmp, commands_list);
@@ -1196,7 +1196,7 @@ static void do_command(const ptr_vector *cmd, string_c *out) {
  * @param cmd The command string to compare with.
  * @return True if the strings are equal (ignoring case), false otherwise.
  */
-static bool cmd_is(const string_c *word, const char *cmd) {
+static bool cmd_is(const lite_string *word, const char *cmd) {
     return string_case_compare_cstr(word, cmd);
 }
 
@@ -1208,7 +1208,7 @@ static bool g_running = true;
  * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_request(const ptr_vector *cmd, string_c *out) {
+static void do_request(const ptr_vector *cmd, lite_string *out) {
     // Check the command vector to determine the type of command
     if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "keys")) {
         do_keys(cmd, out);
@@ -1236,7 +1236,7 @@ static void do_request(const ptr_vector *cmd, string_c *out) {
         do_zquery(cmd, out);
     } else if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "shutdown")) {
         g_running = false;
-        string_c *tmp = string_new();
+        lite_string *tmp = string_new();
         string_append_cstr(tmp, "Server is shutting down...");
         out_str(out, tmp, string_length(tmp));
         string_free(tmp);
@@ -1284,7 +1284,7 @@ static bool try_one_request(Conn *conn) {
         return false;
     }
     // Got one request, generate the response.
-    string_c *out = string_new();
+    lite_string *out = string_new();
     do_request(cmd, out);
 
     // pack the response into the buffer
@@ -1312,7 +1312,7 @@ static bool try_one_request(Conn *conn) {
 
     string_free(out);
     for (size_t i = 0; i < ptr_vector_size(cmd); ++i) {
-        string_c *ptr = ptr_vector_at(cmd, i);
+        lite_string *ptr = ptr_vector_at(cmd, i);
         if (ptr) string_free(ptr);
     }
     ptr_vector_free(cmd);
