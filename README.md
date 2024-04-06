@@ -15,7 +15,7 @@ a set of commands that are sent using a client-server model with TCP sockets.
 * [Building](#building-cachetron)
 * [Running](#running-cachetron)
 * [Testing](#testing)
-  * [Testing the Server and Client](#testing-the-server-and-client)
+  * [Testing the Server and Client](#testing-the-server-and-the-client)
   * [Testing the Data Structures](#testing-the-data-structures)
 * [License](#license)
 
