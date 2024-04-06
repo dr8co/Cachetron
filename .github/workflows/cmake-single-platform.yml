@@ -15,8 +15,8 @@ jobs:
 
     steps:
     - name: Install Ninja and Python 3.12
-      run: sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt update \
-           && sudo apt install ninja-build python3.12
+      run: sudo add-apt-repository ppa:deadsnakes/ppa -y && sudo apt update &&  \
+           sudo apt install ninja-build python3.12 -y
       
     - uses: actions/checkout@v4
 
