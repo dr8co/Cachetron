@@ -30,6 +30,9 @@ jobs:
       working-directory: ${{github.workspace}}/build
       run: ctest -C ${{env.BUILD_TYPE}}
 
+    - name: List all Python interpreters
+      run: ls /usr/bin/python* /usr/local/bin/python* /usr/bin/env | grep python
+
     - name: Test server and client
       working-directory: ${{github.workspace}}
       run: |
