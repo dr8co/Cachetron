@@ -8,6 +8,18 @@ an application cache or a quick-response database.
 It is **a key-value store** that provides access to data structures via
 a set of commands that are sent using a client-server model with TCP sockets.
 
+## Table of Contents
+
+* [About](#about)
+* [Supported Commands](#supported-commands)
+* [Building](#building-cachetron)
+* [Running](#running-cachetron)
+* [Testing](#testing)
+  * [Testing the Server and Client](#testing-the-server-and-client)
+  * [Testing the Data Structures](#testing-the-data-structures)
+* [License](#license)
+
+
 ## Supported Commands
 
 Cachetron supports the following commands:
@@ -40,7 +52,7 @@ To build Cachetron, you will need to have the following installed:
 - `CMake` 3.27 or later
 - `Clang 18` and later or `GCC 13` and later. **C23 support is required**.
 - `Ninja` 1.11 or later (optional, but recommended)
-- `Python` 3.11 or later (optional, for running tests)
+- `Python` 3.11 or later (optional, for testing)
 
 To build Cachetron, follow these steps:
 
@@ -48,22 +60,29 @@ To build Cachetron, follow these steps:
 # Clone the repository (or download the source code)
 git clone https://github.com/dr8co/Cachetron.git
 
+# Change directory to the project root
+cd Cachetron
+
 # Build from the main branch
 git checkout main
 
-# Change directory to the project root
-cd Cachetron
+# Create a build directory
+mkdir build
 
 # Configure CMake
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
 
 # Build the server and client binaries
-cmake --build build --target server client -j 4
+cmake --build build --target server client -j $(nproc)
 ```
 
 Replace `-G Ninja` with `-G "Unix Makefiles"` if you don't have Ninja installed,
 or remove it to use the default generator for your system.\
 Other generators may be used as well.
+
+Pass the number of jobs to the `-j` flag to speed up the build process.\
+The above `$(nproc)` command will use the number of processors available on your system,
+assuming you are on a **Linux system** (Which **is the only target system for this project**).\
 
 This builds the project in release mode. To build in debug mode, replace `Release` with `Debug`.
 
@@ -100,6 +119,8 @@ or you stop it using `Ctrl+C` or by sending appropriate signals to the process.
 
 ## Testing
 
+### Testing the Server and the Client
+
 A [python script](./test_cmds.py) is provided to run tests on the server.
 
 To run the script, you will need to have Python 3.11 or later
@@ -131,7 +152,7 @@ cp test_cmds.py build/
 ```
 
 The script assumes that the server is running on `localhost:1234`.
-If not, it will search for the server executable in its 
+If not, it will search for the server executable in its
 working directory and start it.\
 The server path can be passed with `--server` flag:
 
@@ -167,6 +188,39 @@ Remember to deactivate the virtual environment when you are done:
 # Exit the virtual environment
 exit
 ```
+
+### Testing the Data Structures
+
+The server uses a set of data structures to store the keys and values.
+
+These data structures are tested using the [Google Test](https://google.github.io/googletest/ "GTest") framework.
+
+A C++-14 capable compiler is required to run the tests.\
+Since the project is built with C23 support, a C++-14 capable compiler should be available.
+
+The tests have been configured to run with the CMake build system.
+
+To run the tests, you need to build the test binaries:
+
+```bash
+# From the project root,
+# Configure CMake if you haven't already
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
+
+# Build all targets
+cmake --build build --target all -j $(nproc)
+```
+
+After building the project, you can run the tests:
+
+```bash
+# Assuming you are still in the project root and you have built the project
+cd build && ctest -C Release -j $(nproc)
+```
+
+Remember to replace `-C Release` with `-C Debug` if you built the project in debug mode.
+
+Do not try running the tests if you haven't built the test binaries.
 
 ## License
 
