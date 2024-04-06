@@ -33,7 +33,7 @@ jobs:
     - name: Test server and client
       working-directory: ${{github.workspace}}
       run: |
-        curl -sSL https://install.python-poetry.org | python3 -
+        curl -sSL https://install.python-poetry.org | python3.12 -
         poetry install
         poetry shell
         ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
