@@ -38,7 +38,10 @@ jobs:
     - name: Test server and client
       working-directory: ${{github.workspace}}
       run: |
-        curl -sSL https://install.python-poetry.org | python3.12 -
+        python3.12 -m pip install --user pipx
+        python3.12 -m pipx ensurepath
+        sudo pipx ensurepath --global
+        python3.12 -m pipx install poetry
         poetry install
         poetry shell
         ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
