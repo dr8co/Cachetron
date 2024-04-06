@@ -37,7 +37,7 @@ Cachetron uses CMake as its build system, and **it is intended for Linux systems
 
 To build Cachetron, you will need to have the following installed:
 
-- `CMake` 3.28 or later
+- `CMake` 3.27 or later
 - `Clang 18` and later or `GCC 13` and later. **C23 support is required**.
 - `Ninja` 1.11 or later (optional, but recommended)
 - `Python` 3.11 or later (optional, for running tests)
