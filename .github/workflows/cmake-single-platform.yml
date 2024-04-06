@@ -18,6 +18,9 @@ jobs:
       run: |
         sudo apt update && sudo apt install curl ninja-build  python3-poetry -y
         curl https://pyenv.run | bash
+        echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+        echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+        echo 'eval "$(pyenv init -)"' >> ~/.bashrc
       
     - uses: actions/checkout@v4
 
