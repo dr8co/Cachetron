@@ -1,4 +1,4 @@
-name: CMake on a single platform
+name: Tests on Ubuntu
 
 on:
   push:
@@ -32,5 +32,9 @@ jobs:
 
     - name: Test server and client
       working-directory: ${{github.workspace}}
-      run: ./test_cmds.py
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        poetry install
+        poetry shell
+        ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
 
