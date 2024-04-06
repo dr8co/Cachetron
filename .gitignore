@@ -624,3 +624,7 @@ Packages/
 
 # Poetry
 poetry.lock
+
+# Testing
+coverage/
+Testing/
