@@ -17,14 +17,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt update
-        sudo apt install build-essential libssl-dev zlib1g-dev \
-        libbz2-dev libreadline-dev libsqlite3-dev curl ninja-build python3-poetry \
-        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev -y
-        curl https://pyenv.run | bash
-        echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-        echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-        echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-        exec "$SHELL"
+        sudo apt install ninja-build python3-poetry -y
       
     - uses: actions/checkout@v4
 
@@ -42,8 +35,7 @@ jobs:
     - name: Test the server and the client
       working-directory: ${{github.workspace}}
       run: |
-        pyenv install 3.12.2
-        pyenv local 3.12.2
+        sed -i 's/3.11/3.10/' ./pyproject.toml
         poetry install
         poetry shell
         ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
