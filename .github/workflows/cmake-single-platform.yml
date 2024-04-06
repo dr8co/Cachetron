@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install Ninja and Python 3.12
+    - name: Install Dependencies
       run: |
-        sudo add-apt-repository ppa:deadsnakes/ppa -y
-        sudo apt update && sudo apt install ninja-build python3.12  python3-poetry -y
+        sudo apt update && sudo apt install curl ninja-build  python3-poetry -y
+        curl https://pyenv.run | bash
       
     - uses: actions/checkout@v4
 
@@ -32,10 +32,11 @@ jobs:
       working-directory: ${{github.workspace}}/build
       run: ctest -C ${{env.BUILD_TYPE}}
 
-    - name: Test server and client
+    - name: Test the server and the client
       working-directory: ${{github.workspace}}
       run: |
-        poetry env use python3.12
+        pyenv install 3.12.2
+        pyenv local 3.12.2
         poetry install
         poetry shell
         ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
