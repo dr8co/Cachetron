@@ -19,24 +19,23 @@ a set of commands that are sent using a client-server model with TCP sockets.
   * [Testing the Data Structures](#testing-the-data-structures)
 * [License](#license)
 
-
 ## Supported Commands
 
 Cachetron supports the following commands:
 
-- `GET <key>`: Get the value of a key.
-- `SET <key> <value>`: Set the value of a key.
-- `DEL <key>`: Delete a key.
-- `KEYS`: Get all keys.
-- `ZADD <key> <score> <value>`: Add a value to a sorted set.
-- `ZREM <key> <value>`: Remove a value from a sorted set.
-- `ZSCORE <key> <value>`: Get the score of a value in a sorted set.
-- `ZQUERY <key> <min> <max>`: Get all values in a sorted set with scores between `min` and `max`.
-- `EXISTS <key>`: Check if a key exists.
-- `EXPIRE <key> <milliseconds>`: Set a key to expire in `milliseconds` milliseconds.
-- `TTL <key>`: Get the time-to-live of a key in milliseconds.
-- `COMMAND [list]`: Get a list of all commands or their verbose descriptions.
-- `SHUTDOWN`: Shutdown the server.
+* `GET <key>`: Get the value of a key.
+* `SET <key> <value>`: Set the value of a key.
+* `DEL <key>`: Delete a key.
+* `KEYS`: Get all keys.
+* `ZADD <key> <score> <value>`: Add a value to a sorted set.
+* `ZREM <key> <value>`: Remove a value from a sorted set.
+* `ZSCORE <key> <value>`: Get the score of a value in a sorted set.
+* `ZQUERY <key> <min> <max>`: Get all values in a sorted set with scores between `min` and `max`.
+* `EXISTS <key>`: Check if a key exists.
+* `EXPIRE <key> <milliseconds>`: Set a key to expire in `milliseconds` milliseconds.
+* `TTL <key>`: Get the time-to-live of a key in milliseconds.
+* `COMMAND [list]`: Get a list of all commands or their verbose descriptions.
+* `SHUTDOWN`: Shutdown the server.
 
 These commands are similar to those provided by Redis, but Cachetron is not
 intended to be a drop-in replacement for Redis.
@@ -49,10 +48,10 @@ Cachetron uses CMake as its build system, and **it is intended for Linux systems
 
 To build Cachetron, you will need to have the following installed:
 
-- `CMake` 3.27 or later
-- `Clang 18` and later or `GCC 13` and later. **C23 support is required**.
-- `Ninja` 1.11 or later (optional, but recommended)
-- `Python` 3.11 or later (optional, for testing)
+* `CMake` 3.27 or later
+* `Clang 18` and later or `GCC 13` and later. **C23 support is required**.
+* `Ninja` 1.11 or later (optional, but recommended)
+* `Python` 3.11 or later (optional, for testing)
 
 To build Cachetron, follow these steps:
 
@@ -126,8 +125,8 @@ A [python script](./test_cmds.py) is provided to run tests on the server.
 To run the script, you will need to have Python 3.11 or later
 and the following packages installed:
 
-- `termcolor`
-- `poetry` (optional, for managing the environment and dependencies)
+* `termcolor`
+* `poetry` (optional, for managing the environment and dependencies)
 
 [Pyproject.toml](./pyproject.toml) contains the poetry configuration.\
 Use it to install the dependencies and activate the virtual environment:
