@@ -971,15 +971,10 @@ static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
  * This parameter is not used in this function.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_keys(const ptr_vector *cmd[[maybe_unused]
-
-],
-lite_string *out
-) {
-out_arr(out, hm_size(
-&g_data.db));
-h_scan(&g_data.db.ht1,  &cb_scan, out);
-h_scan(&g_data.db.ht2,  &cb_scan, out);
+static void do_keys([[maybe_unused]] const ptr_vector *cmd, lite_string *out) {
+    out_arr(out, hm_size(&g_data.db));
+    h_scan(&g_data.db.ht1, &cb_scan, out);
+    h_scan(&g_data.db.ht2, &cb_scan, out);
 }
 
 /**
