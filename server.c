@@ -971,10 +971,15 @@ static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
  * This parameter is not used in this function.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_keys(const ptr_vector *cmd [[maybe_unused]], lite_string *out) {
-    out_arr(out, hm_size(&g_data.db));
-    h_scan(&g_data.db.ht1,  &cb_scan, out);
-    h_scan(&g_data.db.ht2,  &cb_scan, out);
+static void do_keys(const ptr_vector *cmd[[maybe_unused]
+
+],
+lite_string *out
+) {
+out_arr(out, hm_size(
+&g_data.db));
+h_scan(&g_data.db.ht1,  &cb_scan, out);
+h_scan(&g_data.db.ht2,  &cb_scan, out);
 }
 
 /**
@@ -1485,7 +1490,33 @@ void free_g_data() {
     // hm_destroy(&g_data.db);
 }
 
-int main() {
+int main(int argc, char **argv) {
+    // Default port number
+    int port = 1234;
+
+    // Change the port number if specified
+    if (argc == 3 && strcmp(argv[1], "--port") == 0) {
+        port = (int) strtol(argv[2], nullptr, 10);
+        if (port <= 0 || port > 65535) {
+            die("Invalid port number");
+        }
+    } else if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+        puts("Usage: server [-h | --help] [--port PORT]\n");
+        puts("Start the Cachetron server.\n");
+        puts("Options:");
+        puts("  -h, --help\tShow this help message and exit");
+        puts("  --port PORT\tSpecify the port number to listen on");
+        return 0;
+    } else if (argc != 1) { // Invalid options
+        fputs("Usage: server [-h | --help] [--port PORT]\n", stderr);
+        fputs("error: unrecognized arguments: ", stderr);
+        for (int i = 1; i < argc; fputs(argv[i++], stderr)) {
+            fputc(' ', stderr);
+        }
+        fputc('\n', stderr);
+        return 1;
+    }
+
     // Create a listening socket
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) die("socket() failure");
@@ -1497,7 +1528,7 @@ int main() {
     // Bind the socket to the address and port
     struct sockaddr_in addr = {};
     addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
+    addr.sin_port = ntohs(port);
     addr.sin_addr.s_addr = ntohl(0); // wildcard address 0.0.0.0
 
     int rv = bind(fd, (const struct sockaddr *) &addr, sizeof(addr));
