@@ -14,10 +14,17 @@ add_executable(test_deque
         ../data_structures/queue/deque_c.c
         ../data_structures/queue/deque_c.h)
 
+add_executable(test_avl
+        test_avl.cpp
+        ../data_structures/trees/avl.c
+        ../data_structures/trees/avl.h)
+
 # Link test executables with gtest
 target_link_libraries(test_vector gtest gtest_main)
 target_link_libraries(test_string gtest gtest_main)
 target_link_libraries(test_deque gtest gtest_main)
+target_link_libraries(test_avl gtest gtest_main)
+
 
 include(GoogleTest)
 
@@ -25,3 +32,4 @@ include(GoogleTest)
 gtest_discover_tests(test_vector)
 gtest_discover_tests(test_string)
 gtest_discover_tests(test_deque)
+gtest_discover_tests(test_avl)
