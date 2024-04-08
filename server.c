@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -6,7 +7,6 @@
 #include <sys/socket.h>
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <poll.h>
 #include <math.h>
 #include <time.h>
@@ -115,21 +115,6 @@ static uint64_t get_monotonic_micro() {
 }
 
 /**
- * @brief Sets a file descriptor to non-blocking mode.
- *
- * @param fd The file descriptor to be set to non-blocking mode.
- */
-static void fd_set_nb(const int fd) {
-    // get the current flags
-    const int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) die("fcntl error");
-
-    // set the non-blocking flag
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-        die("fcntl error");
-}
-
-/**
  * @brief Global data structure for the server.
  *
  * This structure contains the database (hash map) used by the server to store key-value pairs.\n
@@ -167,13 +152,11 @@ static int32_t accept_new_conn(const int fd) {
     // Accept a new client connection
     struct sockaddr_in client_addr = {};
     socklen_t socklen = sizeof(client_addr);
-    const int conn_fd = accept(fd, (struct sockaddr *) &client_addr, &socklen);
+    const int conn_fd = accept4(fd, (struct sockaddr *) &client_addr, &socklen, SOCK_NONBLOCK | SOCK_CLOEXEC);
     if (conn_fd < 0) {
         report_error("accept() error");
         return -1; // error
     }
-    // Set the new connection file descriptor to non-blocking mode
-    fd_set_nb(conn_fd);
     // Create a new connection structure
     Conn *conn = malloc(sizeof(Conn));
     if (conn) {
@@ -1513,7 +1496,8 @@ int main(int argc, char **argv) {
     }
 
     // Create a listening socket
-    const int fd = socket(AF_INET, SOCK_STREAM, 0);
+    const int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+
     if (fd < 0) die("socket() failure");
 
     // Set the SO_REUSEADDR option for the socket
@@ -1533,9 +1517,7 @@ int main(int argc, char **argv) {
     rv = listen(fd, SOMAXCONN);
     if (rv) die("listen() failure");
 
-    // Set the server socket to non-blocking mode
-    fd_set_nb(fd);
-
+    // Initializations
     init_g_data();
     vector_c *poll_args = vector_new(sizeof(struct pollfd));
 
