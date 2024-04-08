@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.27)
 
-project(Cachetron C CXX)
+project(Cachetron
+        VERSION 0.1.0
+        DESCRIPTION "A simple in-memory key-value store with a client-server architecture."
+        HOMEPAGE_URL "https://github.com/dr8co/Cachetron"
+        LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -25,6 +29,10 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif ()
 
+# Find pthreads
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads REQUIRED)
+
 # Additional options for the Debug build
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wpedantic")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wpedantic")
@@ -43,18 +51,6 @@ if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
     # set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=memory -fPIE -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O1")
 endif ()
 
-# Google Test
-include(FetchContent)
-
-FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/archive/f10e11fb27301fba21caa71030bb5024e67aa135.zip
-)
-
-FetchContent_MakeAvailable(googletest)
-
-enable_testing()
-
 # Data structures
 file(GLOB_RECURSE DS_SOURCES
         data_structures/*.c
@@ -69,14 +65,30 @@ add_executable(server
         commands.h
         ${DS_SOURCES})
 
+target_link_libraries(server Threads::Threads)
+
 # client executable
 add_executable(client
         client.c
         common.h
         data_structures/vector/vector_c.c
         data_structures/vector/vector_c.h
-        data_structures/string/string_c.c
-        data_structures/string/string_c.h)
+        data_structures/string/lite_string.c
+        data_structures/string/lite_string.h)
+
+target_link_libraries(client Threads::Threads)
+
+# Google Test
+include(FetchContent)
+
+FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/f10e11fb27301fba21caa71030bb5024e67aa135.zip
+)
+
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
 
 # Tests
 add_subdirectory(tests)

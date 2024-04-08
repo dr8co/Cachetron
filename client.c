@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <errno.h>
 
-#include "data_structures/string/string_c.h"
+#include "data_structures/string/lite_string.h"
 #include "data_structures/vector/vector_c.h"
 #include "common.h"
 
@@ -155,7 +155,8 @@ static int32_t process_response(const uint8_t *data, const size_t size) {
             if (size < 1 + 8) {
                 report_error("bad response");
                 return -1;
-            } {
+            }
+            {
                 int32_t code = 0;
                 uint32_t len = 0;
                 memcpy(&code, &data[1], 4);
@@ -175,7 +176,8 @@ static int32_t process_response(const uint8_t *data, const size_t size) {
             if (size < 1 + 4) {
                 report_error("bad response");
                 return -1;
-            } {
+            }
+            {
                 uint32_t len = 0;
                 memcpy(&len, &data[1], 4);
                 if (size < 1 + 4 + len) {
@@ -191,7 +193,8 @@ static int32_t process_response(const uint8_t *data, const size_t size) {
             if (size < 1 + 8) {
                 report_error("bad response");
                 return -1;
-            } {
+            }
+            {
                 int64_t val = 0;
                 memcpy(&val, &data[1], 8);
                 printf("(int) %ld\n", val);
@@ -203,7 +206,8 @@ static int32_t process_response(const uint8_t *data, const size_t size) {
             if (size < 1 + 8) {
                 report_error("bad response");
                 return -1;
-            } {
+            }
+            {
                 double val = 0;
                 memcpy(&val, &data[1], 8);
                 printf("(dbl) %g\n", val);
@@ -215,7 +219,8 @@ static int32_t process_response(const uint8_t *data, const size_t size) {
             if (size < 1 + 4) {
                 report_error("bad response");
                 return -1;
-            } {
+            }
+            {
                 uint32_t len = 0;
                 memcpy(&len, &data[1], 4);
                 printf("(arr) len=%u\n", len);
@@ -277,9 +282,41 @@ static int32_t read_res(const int fd) {
     return rv;
 }
 
-int main(const int argc, char **argv) {
+int main(int argc, char **argv) {
+    // Default port number
+    int port = 1234;
+
+    int port_index = -1;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--port") == 0) {
+            port_index = i;
+            break;
+        }
+    }
+    if (port_index != -1) {
+        port = (int) strtol(argv[port_index + 1], nullptr, 10);
+        if (port <= 0 || port > 65535) {
+            fprintf(stderr, "Invalid port number: %s\n", argv[port_index + 1]);
+            return 1;
+        }
+        // Remove the port number from the argument list
+        for (int i = port_index; i < argc - 2; ++i) {
+            argv[i] = argv[i + 2];
+        }
+        argc -= 2;
+    }
+    if (argc == 2 && (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0)) {
+        puts("Usage: client [-h | --help] [--port PORT] <command> [args...]\n");
+        puts("Send a command to the Cachetron server and print the response.\n");
+        puts("Options:");
+        puts("  -h, --help\tShow this help message and exit.");
+        puts("  --port PORT\tSpecify the port number to connect to.\n");
+        puts("Send 'COMMAND' to the server to get a list of available commands.");
+        return 0;
+    }
+    // Check if the user provided a command
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s <command> [args...]\n", argv[0]);
+        fputs("Usage: client [-h | --help] [--port PORT] <command> [args...]\n", stderr);
         return 1;
     }
     // Create a socket
@@ -289,7 +326,7 @@ int main(const int argc, char **argv) {
     // Connect to the server
     struct sockaddr_in addr = {};
     addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
+    addr.sin_port = ntohs(port);
     addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK); // 127.0.0.1
 
     const int rv = connect(fd, (const struct sockaddr *) &addr, sizeof addr);
