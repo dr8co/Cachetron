@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.27)
 
-project(Cachetron C CXX)
+project(Cachetron
+        VERSION 0.1.0
+        DESCRIPTION "A simple in-memory key-value store with a client-server architecture."
+        HOMEPAGE_URL "https://github.com/dr8co/Cachetron"
+        LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
