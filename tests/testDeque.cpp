@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include "../data_structures/queue/deque_c.h"
 
-TEST(DequeCTest, CreateDequeShouldInitializeEmptyDeque) {
+TEST(DequeTest, CreateShouldInitializeEmptyDeque) {
     Deque *deque = create_deque();
     ASSERT_NE(deque, nullptr);
     ASSERT_TRUE(deque_empty(deque));
@@ -9,7 +9,7 @@ TEST(DequeCTest, CreateDequeShouldInitializeEmptyDeque) {
     destroy_deque(deque);
 }
 
-TEST(DequeCTest, DequePushFrontShouldAddElementToFront) {
+TEST(DequeTest, PushFrontShouldAddElementToFront) {
     Deque *deque = create_deque();
     int data = 5;
     ASSERT_TRUE(deque_push_front(deque, &data));
@@ -18,7 +18,7 @@ TEST(DequeCTest, DequePushFrontShouldAddElementToFront) {
     destroy_deque(deque);
 }
 
-TEST(DequeCTest, DequePushBackShouldAddElementToBack) {
+TEST(DequeTest, PushBackShouldAddElementToBack) {
     Deque *deque = create_deque();
     int data = 5;
     ASSERT_TRUE(deque_push_back(deque, &data));
@@ -27,7 +27,7 @@ TEST(DequeCTest, DequePushBackShouldAddElementToBack) {
     destroy_deque(deque);
 }
 
-TEST(DequeCTest, DequePopFrontShouldRemoveAndReturnFrontElement) {
+TEST(DequeTest, PopFrontShouldRemoveAndReturnFrontElement) {
     Deque *deque = create_deque();
     int data = 5;
     deque_push_front(deque, &data);
@@ -36,7 +36,7 @@ TEST(DequeCTest, DequePopFrontShouldRemoveAndReturnFrontElement) {
     destroy_deque(deque);
 }
 
-TEST(DequeCTest, DequePopBackShouldRemoveAndReturnBackElement) {
+TEST(DequeTest, PopBackShouldRemoveAndReturnBackElement) {
     Deque *deque = create_deque();
     int data = 5;
     deque_push_back(deque, &data);
@@ -45,7 +45,7 @@ TEST(DequeCTest, DequePopBackShouldRemoveAndReturnBackElement) {
     destroy_deque(deque);
 }
 
-TEST(DequeCTest, DequeResizeShouldDoubleCapacityWhenFull) {
+TEST(DequeTest, ResizeShouldDoubleCapacityWhenFull) {
     Deque *deque = create_deque();
     for (int i = 0; i < 16; ++i) {
         deque_push_back(deque, &i);
