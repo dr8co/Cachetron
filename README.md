@@ -81,7 +81,7 @@ Other generators may be used as well.
 
 Pass the number of jobs to the `-j` flag to speed up the build process.\
 The above `$(nproc)` command will use the number of processors available on your system,
-assuming you are on a **Linux system** (Which **is the only target system for this project**).\
+assuming you are on a **Linux system** (Which **is the only target system for this project**).
 
 This builds the project in release mode. To build in debug mode, replace `Release` with `Debug`.
 
@@ -101,6 +101,12 @@ To start the server, run it from the `build` directory:
 The server will start listening on `localhost:1234` by default.
 If the port is already in use, the server will exit with an error.
 
+To change the port, pass it with the `--port` flag:
+
+```bash
+./build/server --port 12345
+```
+
 The server should be running before you start the client.
 Leave it running in the background or in a separate terminal.
 
@@ -111,10 +117,29 @@ Use the client to run the commands:
 ./build/client COMMAND
 ```
 
+**Make sure both the client and the server are using the same port.**
+
+Like the server, the client will use `localhost:1234` by default.
+
+To change the port, pass it with the `--port` flag:
+
+```bash
+./build/client --port 12345 COMMAND
+```
+
 Replace `COMMAND` with one of the supported commands listed above.
 
 The server runs indefinitely until you send the `SHUTDOWN` command,
 or you stop it using `Ctrl+C` or by sending appropriate signals to the process.
+
+The server prints **`'EOF'`** to the console after executing each command.
+
+**Caveats**:
+
+1. The server does not support multiple clients at the same time.
+2. The client currently does not support interactive mode.
+Only one command can be sent at a time.
+If the port was changed, it must be passed with every command.
 
 ## Testing
 
@@ -122,13 +147,12 @@ or you stop it using `Ctrl+C` or by sending appropriate signals to the process.
 
 A [python script](./test_cmds.py) is provided to run tests on the server.
 
-To run the script, you will need to have Python 3.11 or later
-and the following packages installed:
+Python 3.11 or later and the `termcolor` package are required to run the tests.
 
-* `termcolor`
-* `poetry` (optional, for managing the environment and dependencies)
+The project uses [Poetry](https://python-poetry.org/ "Poetry") to manage the script's
+virtual environment and dependencies.
 
-[Pyproject.toml](./pyproject.toml) contains the poetry configuration.\
+The [pyproject.toml](./pyproject.toml) file contains the Poetry configuration.\
 Use it to install the dependencies and activate the virtual environment:
 
 ```bash
@@ -157,6 +181,12 @@ The server path can be passed with `--server` flag:
 
 ```bash
 ./test_cmds.py --server ./build/server
+```
+
+If the port is in use, pass a different port with the `--port` flag:
+
+```bash
+./test_cmds.py --server ./build/server --port 12345
 ```
 
 The script also searches for the client executable in the same directory.\
@@ -188,13 +218,34 @@ Remember to deactivate the virtual environment when you are done:
 exit
 ```
 
+**Note**: Running the script is roughly similar to:
+
+```bash
+# Running the server in the background
+./build/server > /dev/null 2>&1 &
+
+# Running the tests with the client in a loop
+# The tests are predefined in the script
+for (( i = 0; i < cmds_len; i++ )); do
+    output=$(./build/client COMMAND) # The command is different for each iteration
+        
+    # Log the output if it is unexpected
+    if [ "$output" != "${expected_output[$i]}" ]; then
+        env echo -e "Test $i failed: Expected:\n '${expected_output[$i]}'\nbut got:\n'$output'"
+    fi
+done
+
+# The last command stops the server
+./build/client SHUTDOWN
+```
+
 ### Testing the Data Structures
 
 The server uses a set of data structures to store the keys and values.
 
 These data structures are tested using the [Google Test](https://google.github.io/googletest/ "GTest") framework.
 
-A C++-14 capable compiler is required to run the tests.\
+The Google Test Suite requires a C++-14 capable compiler.\
 Since the project is built with C23 support, a C++-14 capable compiler should be available.
 
 The tests have been configured to run with the CMake build system.
