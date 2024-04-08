@@ -82,24 +82,26 @@ $ ./client shutdown
 '''
 
 
-def is_server_running() -> bool:
+def is_server_running(port: int = 1234) -> bool:
     """
     Checks if the server is running.
+    :param port: Port number to check.
     :return: True if the server is running, False otherwise.
     """
     import socket
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('localhost', 1234)) == 0
+        return s.connect_ex(('localhost', port)) == 0
 
 
 server_pid = Value('i', 0)
 
 
-def start_server(server_path: str) -> None:
+def start_server(server_path: str, port: int = 1234) -> None:
     """
     Starts the server.
     :param server_path: Path to the server executable.
+    :param port: Port number to listen on.
     :return: None
     """
 
@@ -109,7 +111,8 @@ def start_server(server_path: str) -> None:
         :return: None
         """
         global server_pid
-        server_process = subprocess.Popen([server_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        server_process = subprocess.Popen([server_path, "--port", str(port)],
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         server_pid.value = server_process.pid
 
     server_process_ = Process(target=run_server)
@@ -200,15 +203,17 @@ def parse_cases(cases: str) -> Tuple[List[str], List[str]]:
     return cmds_, outputs_
 
 
-def run_commands(cmds_: List[str], outputs_: List[str]) -> bool:
+def run_commands(cmds_: List[str], outputs_: List[str], port: int = 1234) -> bool:
     """
     Run the commands and compare the output with the expected output.
     :param cmds_: List of str commands to run.
     :param outputs_: List of str expected outputs.
+    :param port: Port number to connect to.
     :return: True if all tests pass, False otherwise.
     """
     success = True
     for cmd, expected in zip(cmds_, outputs_):
+        cmd = f"{cmd} --port {port}"
         try:
             out = subprocess.check_output(shlex.split(cmd), timeout=5, stderr=subprocess.STDOUT).decode('utf-8')
 
@@ -268,19 +273,27 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run tests for the client.')
     parser.add_argument('--client', type=str, help='path to the client executable')
     parser.add_argument('--server', type=str, help='path to the server executable')
+    parser.add_argument('--port', type=int, default=1234, help='port number to use for communication')
     parser.add_argument('--no-color', action='store_true', help='disable colored output')
     args = parser.parse_args()
+
+    # Port number must be valid
+    if not 0 < args.port <= 65535:
+        print(colored('Port number must be between 0 and 65535.', 'red'), file=sys.stderr)
+        exit(1)
+
+    print(colored('Using port:', 'green'), colored(args.port, 'yellow', attrs=['bold']), '\n')
 
     # Disable colored output if requested
     if args.no_color:
         os.environ['NO_COLOR'] = '1'
 
     # The server must be running
-    if not is_server_running():
+    if not is_server_running(args.port):
         try:
             server = find_server(args.server)
-            print(colored('Using server:', 'green'), colored(server, 'yellow', attrs=['bold']), '\n')
-            start_server(server)
+            print(colored('Using server:', 'green'), colored(server, 'yellow', attrs=['bold']))
+            start_server(server, args.port)
 
         except TimeoutError as err:
             print(colored(err, 'red'), '\n', file=sys.stderr)
@@ -330,7 +343,7 @@ if __name__ == '__main__':
         exit(1)
 
     try:
-        all_tests_passed = run_commands(cmds, outputs)
+        all_tests_passed = run_commands(cmds, outputs, args.port)
     except ConnectionError as err:
         print(colored(err, 'red'), file=sys.stderr)
         exit(1)
