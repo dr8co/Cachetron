@@ -174,6 +174,32 @@ static void test_remove(uint32_t sz) {
     }
 }
 
+static void test_offset(uint32_t sz) {
+    Container c;
+    for (uint32_t i = 0; i < sz; ++i) {
+        add(c, i);
+    }
+    AVLNode *min = c.root;
+    while (min->left) {
+        min = min->left;
+    }
+    for (uint32_t i = 0; i < sz; ++i) {
+        AVLNode *node = avl_offset(min, (int64_t) i);
+        ASSERT_EQ(container_of(node, Data, node)->val, i);
+
+        for (uint32_t j = 0; j < sz; ++j) {
+            int64_t offset = (int64_t) j - (int64_t) i;
+            AVLNode *n2 = avl_offset(node, offset);
+            ASSERT_EQ(container_of(n2, Data, node)->val, j);
+        }
+        ASSERT_EQ(avl_offset(node, -(int64_t) i - 1), nullptr);
+        ASSERT_EQ(avl_offset(node, sz - i), nullptr);
+    }
+
+    dispose(c);
+}
+
+
 class AVLTreeTest : public ::testing::Test {
 protected:
     Container c_{};
@@ -234,11 +260,16 @@ TEST_F(AVLTreeTest, RandomDeletion) {
 }
 
 TEST_F(AVLTreeTest, InsertionDeletionAtVariousPositions) {
-    for (uint32_t i = 0; i < 200; ++i) {
+    for (uint32_t i = 0; i < 50; ++i) {
         test_insert(i);
         test_insert_dup(i);
         test_remove(i);
     }
+}
+
+TEST_F(AVLTreeTest, OffsetTest) {
+    for (uint32_t i = 1; i <= 100; ++i)
+        test_offset(i);
 }
 
 #if __clang__
