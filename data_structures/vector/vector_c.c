@@ -77,22 +77,19 @@ __attribute_pure__ static size_t clp2(size_t x) {
  * @warning This function is for internal use only.
  */
 static bool vector_resize(vector_c *const restrict v, size_t size) {
-    if (v) {
-        if (size <= 16) return true;
+    if (size <= 16) return true;
 
-        // Resize the vector, if necessary
-        size = clp2(size);
-        if (size >= v->capacity) {
-            void *temp = realloc(v->data, size * v->element_size);
-            // If the resizing failed, the existing data is preserved
-            if (temp == nullptr) return false;
-            // Update the vector fields
-            v->data = temp;
-            v->capacity = size;
-        }
-        return true;
+    // Resize the vector, if necessary
+    size = clp2(size);
+    if (size >= v->capacity) {
+        void *temp = realloc(v->data, size * v->element_size);
+        // If the resizing failed, the existing data is preserved
+        if (temp == nullptr) return false;
+        // Update the vector fields
+        v->data = temp;
+        v->capacity = size;
     }
-    return false;
+    return true;
 }
 
 /**
@@ -142,8 +139,7 @@ bool vector_push_back(vector_c *const restrict v, const void *const restrict ele
  * @return A pointer to the element at the given index, or NULL if the index is out of bounds or the vector is NULL.
  */
 void *vector_at(const vector_c *const restrict v, const size_t index) {
-    if (v && index < v->size) return (char *) v->data + index * v->element_size;
-    return nullptr;
+    return v && index < v->size ? (char *) v->data + index * v->element_size : nullptr;
 }
 
 /**
@@ -153,8 +149,7 @@ void *vector_at(const vector_c *const restrict v, const size_t index) {
  * @return A pointer to the last element in the vector, or nullptr if the vector is empty or is nullptr.
  */
 void *vector_back(const vector_c *restrict v) {
-    if (v && v->size) return (char *) v->data + (v->size - 1) * v->element_size;
-    return nullptr;
+    return v && v->size ? (char *) v->data + (v->size - 1) * v->element_size : nullptr;
 }
 
 /**
@@ -164,8 +159,7 @@ void *vector_back(const vector_c *restrict v) {
  * @return A pointer to the first element in the vector, or nullptr if the vector is empty or is nullptr.
  */
 void *vector_front(const vector_c *restrict v) {
-    if (v && v->size) return v->data;
-    return nullptr;
+    return v && v->size ? v->data : nullptr;
 }
 
 /**
@@ -392,22 +386,19 @@ void ptr_vector_free(ptr_vector *const restrict v) {
  * Use \p ptr_vector_expand to increase the number of elements in the vector.
  */
 static bool ptr_vector_resize(ptr_vector *const restrict v, size_t size) {
-    if (v) {
-        if (size <= 16) return true;
+    if (size <= 16) return true;
 
-        // Resize the vector, if necessary
-        size = clp2(size);
-        if (size >= v->capacity) {
-            void *temp = realloc(v->data, size * sizeof(void *));
-            // If the resizing failed, the existing data is preserved
-            if (temp == nullptr) return false;
-            // Update the vector fields
-            v->data = (void **) temp;
-            v->capacity = size;
-            return true;
-        }
+    // Resize the vector, if necessary
+    size = clp2(size);
+    if (size >= v->capacity) {
+        void *temp = realloc(v->data, size * sizeof(void *));
+        // If the resizing failed, the existing data is preserved
+        if (temp == nullptr) return false;
+        // Update the vector fields
+        v->data = (void **) temp;
+        v->capacity = size;
     }
-    return false;
+    return true;
 }
 
 /**
@@ -438,8 +429,7 @@ bool ptr_vector_push_back(ptr_vector *const restrict v, void *const restrict ele
  * @return A pointer to the element at the given index, or NULL if the index is out of bounds or the vector is NULL.
  */
 void *ptr_vector_at(const ptr_vector *const restrict v, const size_t index) {
-    if (v && index < v->size) return v->data[index];
-    return nullptr;
+    return v && index < v->size ? v->data[index] : nullptr;
 }
 
 /**
@@ -505,7 +495,7 @@ bool ptr_vector_set(const ptr_vector *const restrict v, const size_t index, void
  * @note This function differs from \p ptr_vector_resize in that it increases the number of elements
  * (and the capacity, if necessary) in the vector, while \p ptr_vector_resize only changes the capacity of the vector.
  */
-bool ptr_vector_expand(ptr_vector *restrict v, size_t new_size) {
+bool ptr_vector_expand(ptr_vector *restrict v, const size_t new_size) {
     if (v) {
         if (new_size <= v->size) return true;
         if (ptr_vector_resize(v, new_size)) {
@@ -567,8 +557,7 @@ void ptr_vector_clear(ptr_vector *const restrict v) {
  * @return A pointer to the last element in the pointer vector, or nullptr if the vector is empty or is nullptr.
  */
 void *ptr_vector_back(const ptr_vector *restrict v) {
-    if (v && v->size) return v->data[v->size - 1];
-    return nullptr;
+    return v && v->size ? v->data[v->size - 1] : nullptr;
 }
 
 /**
@@ -578,6 +567,5 @@ void *ptr_vector_back(const ptr_vector *restrict v) {
  * @return A pointer to the first element in the pointer vector, or nullptr if the vector is empty or is nullptr.
  */
 void *ptr_vector_front(const ptr_vector *restrict v) {
-    if (v && v->size) return v->data[0];
-    return nullptr;
+    return v && v->size ? v->data[0] : nullptr;
 }
