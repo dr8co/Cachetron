@@ -950,11 +950,9 @@ static void h_scan(const HTab *tab, void (*f)(HNode *, void *), void *arg) {
  *
  * It sends back an array of all keys in the database.
  *
- * @param cmd Pointer to the command vector. The command vector contains the command and its arguments.
- * This parameter is not used in this function.
  * @param out Pointer to the string where the response will be stored.
  */
-static void do_keys([[maybe_unused]] const ptr_vector *cmd, lite_string *out) {
+static void do_keys(const ptr_vector *, lite_string *out) {
     out_arr(out, hm_size(&g_data.db));
     h_scan(&g_data.db.ht1, &cb_scan, out);
     h_scan(&g_data.db.ht2, &cb_scan, out);
@@ -1468,7 +1466,7 @@ void free_g_data() {
     // hm_destroy(&g_data.db);
 }
 
-int main(int argc, char **argv) {
+int main(const int argc, char **argv) {
     // Default port number
     int port = 1234;
 
