@@ -157,35 +157,32 @@ AVLNode *avl_del(const AVLNode *node) {
             if (parent->left == node) parent->left = node->left;
             else parent->right = node->left;
             return avl_fix(parent);
-        } else {
-            // Removing the root?
-            return node->left;
         }
-    } else {
-        // Swap the node with its next sibling
-        AVLNode *victim = node->right;
-        while (victim->left) {
-            victim = victim->left;
-        }
-        AVLNode *root = avl_del(victim);
-
-        *victim = *node;
-        if (victim->left)
-            victim->left->parent = victim;
-
-        if (victim->right)
-            victim->right->parent = victim;
-
-        AVLNode *parent = node->parent;
-        if (parent) {
-            if (parent->left == node) parent->left = victim;
-            else parent->right = victim;
-            return root;
-        } else {
-            // Removing the root?
-            return victim;
-        }
+        // Removing the root?
+        return node->left;
     }
+    // Swap the node with its next sibling
+    AVLNode *victim = node->right;
+    while (victim->left) {
+        victim = victim->left;
+    }
+    AVLNode *root = avl_del(victim);
+
+    *victim = *node;
+    if (victim->left)
+        victim->left->parent = victim;
+
+    if (victim->right)
+        victim->right->parent = victim;
+
+    AVLNode *parent = node->parent;
+    if (parent) {
+        if (parent->left == node) parent->left = victim;
+        else parent->right = victim;
+        return root;
+    }
+    // Removing the root?
+    return victim;
 }
 
 /**
