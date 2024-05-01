@@ -1,4 +1,9 @@
-# Cachetron
+<h1 align="center">Cachetron</h1>
+<h2 align="center">A simple in-memory data structure store</h2>
+
+<p align="center">
+<img alt="A simple in-memory data structure store" height="512" src="./img/cachetron1-rounded@0.5.png" title="Cachetron" width="512"/>
+</p>
 
 ## About
 
