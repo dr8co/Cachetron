@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.28)
 
 project(Cachetron
         VERSION 0.1.0
@@ -10,7 +10,7 @@ set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Google Test requires at least C++14
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Check if the system is Linux
@@ -24,6 +24,9 @@ if (NOT ${CMAKE_C_COMPILER_ID} STREQUAL "GNU" AND NOT ${CMAKE_C_COMPILER_ID} STR
     message(FATAL_ERROR "Only GCC and Clang are supported.")
 endif ()
 
+# Options
+option(BUILD_TESTING "Build tests" ON)
+
 # If the build type is not specified, default to Release
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -33,62 +36,89 @@ endif ()
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 
-# Additional options for the Debug build
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wpedantic")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wpedantic")
+# Additional compile options for the Debug build
+if (NOT MSVC AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(
+                -Wall
+                -Wextra
+                -Werror
+                -Wpedantic
+                -g
+        )
+    endif ()
+endif ()
 
-# Sanitizers for debugging (Disabled by default, slows down the program. Uncomment to enable.)
+# Sanitizers for debugging and testing
 # GCC does not support all sanitizers, so Clang is recommended for this purpose. Requires llvm-symbolizer.
 # The build type should be RelWithDebInfo (or Debug, adjust the variables appropriately) for sanitizers to work properly.
 if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
+    # Common flags for all sanitizers
+    set(sanitizer_common_flags "-fno-omit-frame-pointer -g -O1")
+
     # Address, leak, undefined, integer, nullability sanitizers
-    set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=address,leak,undefined,integer,nullability -fno-omit-frame-pointer -g")
+    set(address_sanitizer_flags "-fsanitize=address,leak,undefined,integer,nullability")
 
     # Thread sanitizer, cannot be used with address sanitizer
-    #  set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=thread -fPIE -fno-omit-frame-pointer -g -O1")
+    set(thread_sanitizer_flags "-fsanitize=thread -fPIE")
 
     # Memory sanitizer, cannot be used with address sanitizer.
-    # set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -fsanitize=memory -fPIE -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O1")
+    set(memory_sanitizer_flags "-fsanitize=memory -fPIE -fno-optimize-sibling-calls")
+
+    # Add flags for Release with Debug Info build
+    if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        add_compile_options(
+                "SHELL:${sanitizer_common_flags}"
+                "SHELL:${address_sanitizer_flags}"
+        )
+    endif ()
 endif ()
 
-# Data structures
-file(GLOB_RECURSE DS_SOURCES
-        data_structures/*.c
-        data_structures/*.h)
-
 # server executable
-add_executable(server
-        server.c
-        common.h
-        thread_pool.c
-        thread_pool.h
-        commands.h
-        ${DS_SOURCES})
-
-target_link_libraries(server Threads::Threads)
-
-# client executable
-add_executable(client
-        client.c
-        common.h
-        data_structures/vector/vector_c.c
-        data_structures/vector/vector_c.h
+add_executable(server)
+target_sources(server PRIVATE
+        data_structures/hashmap/hashtable.c
+        data_structures/list/list.c
+        data_structures/queue/deque_c.c
+        data_structures/set/zset.c
         data_structures/string/lite_string.c
-        data_structures/string/lite_string.h)
-
-target_link_libraries(client Threads::Threads)
-
-# Google Test
-include(FetchContent)
-
-FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/archive/f10e11fb27301fba21caa71030bb5024e67aa135.zip
+        data_structures/trees/avl.c
+        data_structures/trees/heap.c
+        data_structures/vector/vector_c.c
+        thread_pool.c
+        server.c
 )
 
-FetchContent_MakeAvailable(googletest)
+# client executable
+add_executable(client)
+target_sources(client PRIVATE
+        data_structures/vector/vector_c.c
+        data_structures/string/lite_string.c
+        client.c
+)
 
-enable_testing()
+target_link_libraries(client Threads::Threads)
+target_link_libraries(server Threads::Threads)
+
+# Link the enabled sanitizers.
+if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang" AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    target_link_libraries(client asan ubsan)
+    target_link_libraries(server asan ubsan)
+endif ()
 
 # Tests
-add_subdirectory(tests)
+if (BUILD_TESTING)
+    # Google Test
+    include(FetchContent)
+
+    FetchContent_Declare(
+            googletest
+            URL https://github.com/google/googletest/archive/f10e11fb27301fba21caa71030bb5024e67aa135.zip
+    )
+
+    FetchContent_MakeAvailable(googletest)
+
+    enable_testing()
+    add_subdirectory(tests)
+endif ()
+
