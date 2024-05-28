@@ -77,7 +77,7 @@ mkdir build
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
 
 # Build the server and client binaries
-cmake --build build --target server client -j $(nproc)
+cmake --build build --target server client --config Release -j $(nproc)
 ```
 
 Replace `-G Ninja` with `-G "Unix Makefiles"` if you don't have Ninja installed,
@@ -213,7 +213,7 @@ To suppress color output, run the script with `--no-color` flag:
 Alternatively, you can set the `NO_COLOR` environment variable:
 
 ```bash
-NO_COLOR=1 ./test_cmds.py --server ./build/server --client ./build/client
+export NO_COLOR=1 && ./test_cmds.py --server ./build/server --client ./build/client
 ```
 
 Remember to deactivate the virtual environment when you are done:
@@ -263,7 +263,7 @@ To run the tests, you need to build the test binaries:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
 
 # Build all targets
-cmake --build build --target all -j $(nproc)
+cmake --build build --target all --config Release -j $(nproc)
 ```
 
 After building the project, you can run the tests:
@@ -276,6 +276,18 @@ cd build && ctest -C Release -j $(nproc)
 Remember to replace `-C Release` with `-C Debug` if you built the project in debug mode.
 
 Do not try running the tests if you haven't built the test binaries.
+
+To disable building of test binaries, i.e., to disable testing,
+configure CMake with `-DBUILD_TESTING=OFF` option:
+
+```bash
+# From the project root,
+# Configure CMake if you haven't already
+cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja
+
+# Build all targets
+cmake --build build --target all --config Release -j $(nproc)
+```
 
 ## License
 
