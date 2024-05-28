@@ -48,7 +48,7 @@ static void h_init(HTab *htab, size_t n) {
     if ((n & (n - 1)) != 0) n = clp2(n);
 
     // Allocate memory for the table
-    htab->tab = (HNode **) calloc(sizeof(HNode *), n);
+    htab->tab = (HNode **) calloc(n, sizeof(HNode *));
 
     // Initialize the mask and size
     htab->mask = n - 1;
