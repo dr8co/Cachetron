@@ -18,8 +18,6 @@ constexpr size_t k_max_msg = 4096;
 enum : size_t {
     k_max_msg = 4096
 };
-
-#define constexpr const
 #endif
 
 /**

@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 #if !(__GNUC__ >= 13 || __clang_major__ >= 19)
-#define constexpr const
+#define constexpr static const
 #endif
 
 /**
