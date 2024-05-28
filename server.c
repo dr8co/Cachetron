@@ -1,4 +1,7 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -23,7 +26,7 @@
 
 // C Constexpr is supported in GCC 13+ and Clang 19+ (not sure about other compilers)
 #if __GNUC__ >= 13 || __clang_major__ >= 19
-constexpr size_t k_max_msg = 4096; ///< The maximum message size
+constexpr size_t k_max_msg = 4096;  ///< The maximum message size
 constexpr size_t k_max_args = 1024; ///< The maximum number of arguments
 #else
 enum : size_t {
@@ -31,7 +34,7 @@ enum : size_t {
     k_max_args = 1024 ///< The maximum number of arguments
 };
 
-#define constexpr const
+#define constexpr static const
 #endif
 
 /**
@@ -248,12 +251,12 @@ enum {
  * Each entry consists of a key-value pair, the type of the value, and a sorted set (ZSet).
  */
 struct Entry {
-    HNode node;      ///< The node used by the hash map. It is used to link the entries in the hash map.
+    HNode node;         ///< The node used by the hash map. It is used to link the entries in the hash map.
     lite_string *key;   ///< The key of the hash map entry. It identifies the entry in the hash map.
     lite_string *value; ///< The value of the hash map entry. It is the data associated with the key.
-    uint32_t type;   ///< The type of the value. It is used to determine how to interpret the value.
-    ZSet *zset;      ///< The sorted set associated with the entry.
-    size_t heap_idx; ///< The index of the entry in the heap.
+    uint32_t type;      ///< The type of the value. It is used to determine how to interpret the value.
+    ZSet *zset;         ///< The sorted set associated with the entry.
+    size_t heap_idx;    ///< The index of the entry in the heap.
 };
 
 typedef struct Entry Entry;
@@ -799,10 +802,9 @@ static void process_timers() {
         constexpr size_t k_max_works = 2000;
         Entry *ent = container_of(((HeapItem *) vector_at(g_data.heap, 0))->ref, Entry, heap_idx);
         const HNode *node = hm_pop(&g_data.db, &ent->node, &compare_hnode);
-        if (node != &ent->node) {
-            puts("node != &ent->node\n");
-            return;
-        }
+
+        if (node != &ent->node) return;
+
         entry_del(ent);
 
         if (nworks++ >= k_max_works) break;
@@ -1191,39 +1193,59 @@ static bool g_running = true;
  */
 static void do_request(const ptr_vector *cmd, lite_string *out) {
     // Check the command vector to determine the type of command
-    if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "keys")) {
-        do_keys(cmd, out);
-    } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "get")) {
-        do_get(cmd, out);
-    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "set")) {
-        do_set(cmd, out);
-    } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "del")) {
-        do_del(cmd, out);
-    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "expire")) {
-        do_expire(cmd, out);
-    } else if (ptr_vector_size(cmd) == 2 && cmd_is(ptr_vector_at(cmd, 0), "pttl")) {
-        do_ttl(cmd, out);
-    } else if (cmd_is(ptr_vector_at(cmd, 0), "exists")) {
-        do_exists(cmd, out);
-    } else if (cmd_is(ptr_vector_at(cmd, 0), "command")) {
-        do_command(cmd, out);
-    } else if (ptr_vector_size(cmd) == 4 && cmd_is(ptr_vector_at(cmd, 0), "zadd")) {
-        do_zadd(cmd, out);
-    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "zrem")) {
-        do_zrem(cmd, out);
-    } else if (ptr_vector_size(cmd) == 3 && cmd_is(ptr_vector_at(cmd, 0), "zscore")) {
-        do_zscore(cmd, out);
-    } else if (ptr_vector_size(cmd) == 6 && cmd_is(ptr_vector_at(cmd, 0), "zquery")) {
-        do_zquery(cmd, out);
-    } else if (ptr_vector_size(cmd) == 1 && cmd_is(ptr_vector_at(cmd, 0), "shutdown")) {
-        g_running = false;
-        lite_string *tmp = string_new();
-        string_append_cstr(tmp, "Server is shutting down...");
-        out_str(out, tmp, string_length(tmp));
-        string_free(tmp);
-    } else {
-        // cmd is not recognized
-        out_err(out, ERR_UNKNOWN, "Unknown cmd");
+    switch (ptr_vector_size(cmd)) {
+        case 1:
+            if (cmd_is(ptr_vector_at(cmd, 0), "keys")) {
+                do_keys(cmd, out);
+            } else if (cmd_is(ptr_vector_at(cmd, 0), "shutdown")) {
+                g_running = false;
+                lite_string *tmp = string_new();
+                string_append_cstr(tmp, "Server is shutting down...");
+                out_str(out, tmp, string_length(tmp));
+                string_free(tmp);
+            } else goto unknown;
+            return;
+        case 2:
+            if (cmd_is(ptr_vector_at(cmd, 0), "get"))
+                do_get(cmd, out);
+            else if (cmd_is(ptr_vector_at(cmd, 0), "del"))
+                do_del(cmd, out);
+            else if (cmd_is(ptr_vector_at(cmd, 0), "pttl"))
+                do_ttl(cmd, out);
+            else goto unknown;
+            return;
+        case 3:
+            if (cmd_is(ptr_vector_at(cmd, 0), "set"))
+                do_set(cmd, out);
+            else if (cmd_is(ptr_vector_at(cmd, 0), "expire"))
+                do_expire(cmd, out);
+            else if (cmd_is(ptr_vector_at(cmd, 0), "zrem"))
+                do_zrem(cmd, out);
+            else if (cmd_is(ptr_vector_at(cmd, 0), "zscore"))
+                do_zscore(cmd, out);
+            else goto unknown;
+            return;
+        case 4:
+            if (cmd_is(ptr_vector_at(cmd, 0), "zadd"))
+                do_zadd(cmd, out);
+            else goto unknown;
+            return;
+        case 6:
+            if (cmd_is(ptr_vector_at(cmd, 0), "zquery"))
+                do_zquery(cmd, out);
+            else goto unknown;
+            return;
+        default: ;
+
+        unknown:
+            if (cmd_is(ptr_vector_at(cmd, 0), "exists"))
+                do_exists(cmd, out);
+            else if (cmd_is(ptr_vector_at(cmd, 0), "command"))
+                do_command(cmd, out);
+            else {
+                // cmd is not recognized
+                out_err(out, ERR_UNKNOWN, "Unknown cmd");
+            }
     }
 }
 
@@ -1483,7 +1505,8 @@ int main(const int argc, char **argv) {
         puts("  -h, --help\tShow this help message and exit");
         puts("  --port PORT\tSpecify the port number to listen on");
         return 0;
-    } else if (argc != 1) { // Invalid options
+    } else if (argc != 1) {
+        // Invalid options
         fputs("Usage: server [-h | --help] [--port PORT]\n", stderr);
         fputs("error: unrecognized arguments: ", stderr);
         for (int i = 1; i < argc; fputs(argv[i++], stderr)) {
