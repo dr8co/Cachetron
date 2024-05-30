@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
 
       matrix:
-        c_compiler: [gcc-18, clang-18]
+        c_compiler: [gcc-14, clang-18]
         include:
           - c_compiler: gcc-14
             cpp_compiler: g++-14
