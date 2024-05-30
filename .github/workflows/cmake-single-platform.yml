@@ -11,25 +11,46 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+
+      matrix:
+        c_compiler: [gcc-18, clang-18]
+        include:
+          - c_compiler: gcc-14
+            cpp_compiler: g++-14
+          - c_compiler: clang-18
+            cpp_compiler: clang++-18
 
     steps:
     - name: Install Dependencies
       run: |
         sudo apt update
-        sudo apt install ninja-build python3-poetry -y
+        sudo apt install ninja-build gcc-14 clang-18 python3-poetry -y
       
     - uses: actions/checkout@v4
 
+    - name: Set reusable strings
+      id: strings
+      shell: bash
+      run: |
+        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-          -DCMAKE_CXX_COMPILER=g++-13 -DCMAKE_C_COMPILER=gcc-13 -G Ninja
+      run: >
+        cmake -B ${{ steps.strings.outputs.build-output-dir }}
+        -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+        -G Ninja
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all -j $(nproc)
+      run: |
+        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{env.BUILD_TYPE}} --target all -j $(nproc)
 
     - name: Run CTests
-      working-directory: ${{github.workspace}}/build
+      working-directory: ${{ steps.strings.outputs.build-output-dir }}
       run: ctest -C ${{env.BUILD_TYPE}} -j $(nproc)
 
     - name: Test the server and the client
@@ -37,5 +58,5 @@ jobs:
       run: |
         sed -i 's/3.11/3.10/' ./pyproject.toml
         poetry install
-        poetry run ./test_cmds.py --server ${{github.workspace}}/build/server --client ${{github.workspace}}/build/client
+        poetry run ./test_cmds.py --server ${{ steps.strings.outputs.build-output-dir }}/server --client ${{ steps.strings.outputs.build-output-dir }}/client
 
