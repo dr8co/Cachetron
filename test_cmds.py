@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+
+"""
+Test the server and the client executables
+with a series of commands and their expected outputs.
+"""
+
 import os
 import sys
 import shlex
@@ -6,8 +12,8 @@ import atexit
 import argparse
 import subprocess
 from time import sleep
-from typing import List, Tuple
 from termcolor import colored
+from typing import List, Tuple
 from multiprocessing import Process, Value
 
 CASES = r'''
