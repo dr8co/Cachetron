@@ -155,11 +155,27 @@ static int32_t accept_new_conn(const int fd) {
     // Accept a new client connection
     struct sockaddr_in client_addr = {};
     socklen_t socklen = sizeof(client_addr);
+#ifdef _GNU_SOURCE
     const int conn_fd = accept4(fd, (struct sockaddr *) &client_addr, &socklen, SOCK_NONBLOCK | SOCK_CLOEXEC);
+#else
+    const int conn_fd = accept(fd, (struct sockaddr *) &client_addr, &socklen);
+#endif
     if (conn_fd < 0) {
         report_error("accept() error");
         return -1; // error
     }
+#ifndef _GNU_SOURCE
+#include <fcntl.h>
+    // Non-blocking mode
+    errno = 0;
+    const int flags = fcntl(conn_fd, F_GETFL, 0);
+    if (errno) die("fcntl error");
+
+    errno = 0;
+    (void) fcntl(conn_fd, F_SETFL, flags | O_NONBLOCK);
+    if (errno) die("fcntl error");
+#endif
+
     // Create a new connection structure
     Conn *conn = malloc(sizeof(Conn));
     if (conn) {
