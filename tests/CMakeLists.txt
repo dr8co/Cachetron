@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.28)
+
 # Test executables
 add_executable(test_vector)
 target_sources(test_vector PRIVATE
@@ -36,6 +38,14 @@ target_link_libraries(test_vector PRIVATE GTest::gtest GTest::gtest_main)
 target_link_libraries(test_string PRIVATE GTest::gtest GTest::gtest_main)
 target_link_libraries(test_deque PRIVATE GTest::gtest GTest::gtest_main)
 target_link_libraries(test_avl PRIVATE GTest::gtest GTest::gtest_main)
+
+# Link the enabled sanitizers.
+if (ENABLE_SANITIZERS)
+    target_link_libraries(test_vector PRIVATE asan ubsan)
+    target_link_libraries(test_string PRIVATE asan ubsan)
+    target_link_libraries(test_deque PRIVATE asan ubsan)
+    target_link_libraries(test_avl PRIVATE asan ubsan)
+endif ()
 
 include(GoogleTest)
 

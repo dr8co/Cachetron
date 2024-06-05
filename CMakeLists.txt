@@ -18,14 +18,18 @@ if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     message(FATAL_ERROR "This program only targets Linux.")
 endif ()
 
-# GCC and Clang are (probably) the only supported compilers due to use of
-# GNU statement expression extension from macro expansion ('container_of' macro)
-if (NOT ${CMAKE_C_COMPILER_ID} STREQUAL "GNU" AND NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
-    message(FATAL_ERROR "Only GCC and Clang are supported.")
+# GCC and Clang and compatible compilers only
+if (NOT CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    message(FATAL_ERROR "Only GCC and Clang derivatives are supported.")
 endif ()
 
 # Options
+include(CMakeDependentOption)
 option(BUILD_TESTING "Build tests" ON)
+# GCC does not support all sanitizers
+cmake_dependent_option(ENABLE_SANITIZERS
+        "Enable sanitizers (Ignored if not using Clang compiler)" OFF
+        "${CMAKE_C_COMPILER_ID} STREQUAL \"Clang\"" OFF)
 
 # If the build type is not specified, default to Release
 if (NOT CMAKE_BUILD_TYPE)
@@ -35,44 +39,6 @@ endif ()
 # Find pthreads
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
-
-# Additional compile options for the Debug build
-if (NOT MSVC AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(
-                -Wall
-                -Wextra
-                -Werror
-                -Wpedantic
-                -g
-        )
-    endif ()
-endif ()
-
-# Sanitizers for debugging and testing
-# GCC does not support all sanitizers, so Clang is recommended for this purpose. Requires llvm-symbolizer.
-# The build type should be RelWithDebInfo (or Debug, adjust the variables appropriately) for sanitizers to work properly.
-if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
-    # Common flags for all sanitizers
-    set(sanitizer_common_flags "-fno-omit-frame-pointer -g -O1")
-
-    # Address, leak, undefined, integer, nullability sanitizers
-    set(address_sanitizer_flags "-fsanitize=address,leak,undefined,integer,nullability")
-
-    # Thread sanitizer, cannot be used with address sanitizer
-    set(thread_sanitizer_flags "-fsanitize=thread -fPIE")
-
-    # Memory sanitizer, cannot be used with address sanitizer.
-    set(memory_sanitizer_flags "-fsanitize=memory -fPIE -fno-optimize-sibling-calls")
-
-    # Add flags for Release with Debug Info build
-    if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        add_compile_options(
-                "SHELL:${sanitizer_common_flags}"
-                "SHELL:${address_sanitizer_flags}"
-        )
-    endif ()
-endif ()
 
 # server executable
 add_executable(server)
@@ -97,14 +63,51 @@ target_sources(client PRIVATE
         client.c
 )
 
-target_link_libraries(client Threads::Threads)
-target_link_libraries(server Threads::Threads)
+# Expose GNU (and other) C extensions
+target_compile_definitions(server PUBLIC _GNU_SOURCE)
+target_compile_definitions(client PUBLIC _GNU_SOURCE)
 
-# Link the enabled sanitizers.
-if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang" AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    target_link_libraries(client asan ubsan)
-    target_link_libraries(server asan ubsan)
+# Additional compile options for the Debug build
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(
+            -Wall
+            -Wextra
+            -Werror
+            -Wpedantic
+            -g
+    )
+
 endif ()
+
+# Sanitizers for debugging and testing
+# Requires llvm-symbolizer and sanitizer libraries (asan, ubsan, msan, tsan)
+if (ENABLE_SANITIZERS)
+    # Common flags for all sanitizers
+    set(sanitizer_common_flags "-fno-omit-frame-pointer -g -O1")
+
+    # Address, leak, undefined, integer, nullability sanitizers
+    set(address_sanitizer_flags "-fsanitize=address,leak,undefined,integer,nullability")
+
+    # Thread sanitizer, cannot be used with address sanitizer
+    set(thread_sanitizer_flags "-fsanitize=thread -fPIE")
+
+    # Memory sanitizer, cannot be used with address sanitizer.
+    set(memory_sanitizer_flags "-fsanitize=memory -fPIE -fno-optimize-sibling-calls")
+
+    # Add compile options
+    add_compile_options(
+            "SHELL:${sanitizer_common_flags}"
+            "SHELL:${address_sanitizer_flags}"
+    )
+
+    # Link the enabled sanitizers.
+    target_link_libraries(client PRIVATE asan ubsan)
+    target_link_libraries(server PRIVATE asan ubsan)
+endif ()
+
+# Link the threading libraries explicitly
+target_link_libraries(client PRIVATE Threads::Threads)
+target_link_libraries(server PRIVATE Threads::Threads)
 
 # Tests
 if (BUILD_TESTING)
@@ -117,14 +120,12 @@ if (BUILD_TESTING)
 
         FetchContent_Declare(
                 googletest
-                URL https://github.com/google/googletest/archive/a7f443b80b105f940225332ed3c31f2790092f47.zip
+                GIT_REPOSITORY https://github.com/google/googletest.git
+                GIT_TAG a7f443b80b105f940225332ed3c31f2790092f47
+                EXCLUDE_FROM_ALL
         )
 
-        FetchContent_GetProperties(googletest)
-        if (NOT googletest_POPULATED)
-            FetchContent_Populate(googletest)
-            add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
-        endif ()
+        FetchContent_MakeAvailable(googletest)
 
         set(GTest_ManualFetch ON)
 
